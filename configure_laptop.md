@@ -24,9 +24,7 @@ TODO: package and writeup instructions
 
 ### Configuration file
 
-Choose a strong password (e.g. `head -c 16 /dev/urandom | xxd -p`) and put it in `~/.config/backup/restic_password`.
-It is possible to set multiple passwords on a backup, in case you also want a passphrase you can memorize, but please choose a strong one!
-**Also save the password off of your machine and/or print it**.
+Choose a strong password (e.g. `head -c 16 /dev/urandom | xxd -p`) and put it in `~/.config/backup/restic_password`. **Also save the password off of your machine and/or print it**.
 
 Create a folder in your home which will hold your configuration file
 ```
