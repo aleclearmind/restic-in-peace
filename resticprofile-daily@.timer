@@ -1,0 +1,10 @@
+[Unit]
+Description=Scheduled restic daily backup for profile %I
+
+[Timer]
+Unit=resticprofile@.service
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

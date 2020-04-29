@@ -1,0 +1,8 @@
+[Unit]
+Description=Runs restic with profile %I
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/resticprofile -c $HOME/.config/backup/resticprofile.json --name %i backup

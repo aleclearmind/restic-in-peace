@@ -1,0 +1,34 @@
+{
+    "global": {
+        "restic-binary": "/usr/local/bin/restic-in-peace.py"
+    },
+    "common": {
+        "added-size-limit": "5000000000",
+        "skip-on-battery": true,
+        "wifi-whitelist": ["whitelisted-network"],
+        "wifi-blacklist": ["blacklisted-network"],
+        "backup": {
+            "run-before": ["notify-send 'Starting backup...'"],
+            "run-after": ["notify-send 'Finished backup!'"],
+            "check-after": true
+        },
+        "check": {},
+        "password-file": "~/.config/backup/restic_password",
+        "repository": "<repo_path_or_url>",
+        "retention": {
+            "after-backup": true,
+            "keep-daily": "7",
+            "keep-weekly": "4",
+            "keep-monthly": "6",
+            "keep-yearly": "1",
+            "prune": true
+        }
+    },
+    "profile_1": {
+        "inherit": "common",
+        "backup": {
+            "source": ["/home/<user>"],
+            "tag": "profile_1_tag"
+        }
+    }
+}
