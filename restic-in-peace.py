@@ -77,13 +77,12 @@ def run_backup(args, unparsed_args):
         next_line = process.stdout.readline()
         if next_line == "" and process.poll() is not None:
             break
-        logger.debug(next_line)
+        logger.debug("RESTIC", next_line)
 
         try:
             parsed = json.loads(next_line)
         except json.JSONDecodeError:
-            logger.debug("Could not parse line as JSON")
-            logger.debug(next_line)
+            logger.log("RESTIC", "Could not parse line as JSON")
             continue
 
         if parsed["message_type"] == "status" and parsed.get("action", "") == "scan_finished":
