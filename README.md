@@ -2,11 +2,13 @@
 
 Rev.ng tool of choice for backup is [restic](https://restic.net/). 
 We use [resticprofile](https://github.com/creativeprojects/resticprofile/) to manage multiple backup profiles 
-and a custom wrapper to:
+and a custom wrapper caller `restic-in-peace` to:
 
 * detect if a suspiciously big amount of data is being backed up (i.e. you forgot to exclude a new LLVM repo), and in that case abort and alert the user.
 * skip the backup on whitelisted/blacklisted networks
 * skip the backup on battery power
+* send desktop notifications
+* send events to a monitor via HTTP
 
 Read `configure_laptop.md` for instructions on how to install it and setup your laptop.
 
