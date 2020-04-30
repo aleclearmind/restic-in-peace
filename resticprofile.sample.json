@@ -1,6 +1,6 @@
 {
     "global": {
-        "restic-binary": "restic-in-peace"
+        "restic-binary": "/home/<user>/.local/bin/restic-in-peace"
     },
     "common": {
         "added-size-limit": "5000000000",

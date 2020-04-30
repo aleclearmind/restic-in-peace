@@ -47,6 +47,8 @@ snapshots when computing the size increase from the previous backup.
  
 The bare minimum modifications you need are specifying which data to backup and the repo it should be backed up to.
 Your friendly sysadmin will give you the backup repo URL, which you'll need to set in `common.repository`.
+You'll also need to update `global.restic-binary` to wherever you install `restic-in-peace` 
+(there seems to be a bug where the binary is not found even if it is in the path).
 
 These are the main parameters for specifying which data to backup:
 
