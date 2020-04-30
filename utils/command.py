@@ -1,16 +1,10 @@
 import subprocess
-import sys
 
-from loguru import logger
-
-logger.configure(handlers=[
-    {"sink": sys.stdout, "format": "<level>{time}|{level}|{extra[logger_name]}|{message}</level>", "level": "INFO"}
-])
-log = logger.bind(logger_name="command")
+from .logging import logger
 
 
 def run_command(args, shell=False):
-    log.debug(f"About to execute {args}")
+    logger.debug(f"About to execute {args}")
     process = subprocess.run(args, capture_output=True, universal_newlines=True, shell=shell)
     return process
 
@@ -42,7 +36,7 @@ def build_restic_command(command, args_from_argparse,
             continue
         else:
             error = f"Argument {name} is not string, int or list or True (actual type {type(val)})"
-            log.error(error)
+            logger.error(error)
             raise TypeError(error)
         restic_args.append(val)
 

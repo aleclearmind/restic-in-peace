@@ -4,19 +4,10 @@ import argparse
 import json
 import signal
 import subprocess
-import sys
 import time
 
-from loguru import logger
-
 import utils
-from command import build_restic_command, run_command
-
-logger.configure(handlers=[
-    {"sink": sys.stdout, "format": "<level>{time}|{level}|{extra[logger_name]}|{message}</level>", "level": "INFO"}
-])
-wrapper_logs = logger.bind(logger_name="wrapper")
-restic_logs = logger.bind(logger_name="wrapper")
+from utils import logger
 
 return_codes = {
     "SKIP_CAUSE_BATTERY": -1,
@@ -50,7 +41,7 @@ argparser.add_argument("--password-command", help="Password command")
 
 
 def get_latest_snapshot_stats(args):
-    get_latest_snapshot_command = build_restic_command("snapshots", args, additional_argparse_arguments=["tag"])
+    get_latest_snapshot_command = utils.build_restic_command("snapshots", args, additional_argparse_arguments=["tag"])
     process = utils.run_command(get_latest_snapshot_command)
     snapshots = json.loads(process.stdout)
     if not snapshots:
@@ -58,7 +49,7 @@ def get_latest_snapshot_stats(args):
     snapshots.sort(key=lambda s: s["time"], reverse=True)
     latest_snapshot = snapshots[0]
 
-    stats_command = build_restic_command("stats", args, additional_unparsed_arguments=[latest_snapshot["id"]])
+    stats_command = utils.build_restic_command("stats", args, additional_unparsed_arguments=[latest_snapshot["id"]])
     process = utils.run_command(stats_command)
     snapshot_stats = json.loads(process.stdout)
     return latest_snapshot, snapshot_stats
@@ -69,15 +60,15 @@ def run_backup(args, unparsed_args):
     if latest_snapshot is None or latest_snapshot_stats is None:
         latest_snapshot_size = 0
         latest_snapshot_id = "<NONE>"
-        wrapper_logs.warning(
+        logger.warning(
             f"Latest snapshot stats not found. It is normal if this is your first backup. Is the tag correct?")
     else:
         latest_snapshot_size = latest_snapshot_stats["total_size"]
         latest_snapshot_id = latest_snapshot["short_id"]
-        wrapper_logs.info(f"Latest snapshot {latest_snapshot_id} has size {latest_snapshot_size}")
+        logger.info(f"Latest snapshot {latest_snapshot_id} has size {latest_snapshot_size}")
 
-    backup_command = build_restic_command("backup", args, additional_argparse_arguments=["tag"],
-                                          additional_unparsed_arguments=unparsed_args)
+    backup_command = utils.build_restic_command("backup", args, additional_argparse_arguments=["tag"],
+                                                additional_unparsed_arguments=unparsed_args)
 
     process = subprocess.Popen(backup_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                universal_newlines=True)
@@ -86,13 +77,13 @@ def run_backup(args, unparsed_args):
         next_line = process.stdout.readline()
         if next_line == "" and process.poll() is not None:
             break
-        restic_logs.debug(next_line)
+        logger.debug(next_line)
 
         try:
             parsed = json.loads(next_line)
         except json.JSONDecodeError:
-            wrapper_logs.debug("Could not parse line as JSON")
-            wrapper_logs.debug(next_line)
+            logger.debug("Could not parse line as JSON")
+            logger.debug(next_line)
             continue
 
         if parsed["message_type"] == "status" and parsed.get("action", "") == "scan_finished":
@@ -100,10 +91,10 @@ def run_backup(args, unparsed_args):
             total_files = parsed["total_files"]
             data_size = parsed["data_size"]
             duration = int(parsed["duration"])
-            wrapper_logs.info(
+            logger.info(
                 f"Finished filesystem scan in {duration}s, found {data_size} bytes to backup in {total_files} files")
             if args.added_size_limit and data_size - latest_snapshot_size > args.added_size_limit:
-                wrapper_logs.critical(f"Backing up more than {args.added_size_limit} new bytes, aborting!")
+                logger.critical(f"Backing up more than {args.added_size_limit} new bytes, aborting!")
                 process.send_signal(signal.SIGINT)
                 for _ in range(10):
                     if process.poll() is None:
@@ -111,8 +102,8 @@ def run_backup(args, unparsed_args):
                     else:
                         break
                 else:
-                    wrapper_logs.warning("Restic did not gracefully terminate within 10 seconds, sending SIGKILL")
-                    wrapper_logs.warning("You might need to run the unlock command")
+                    logger.warning("Restic did not gracefully terminate within 10 seconds, sending SIGKILL")
+                    logger.warning("You might need to run the unlock command")
                     process.kill()
                     process.wait()
 
@@ -127,10 +118,10 @@ def run_backup(args, unparsed_args):
             files_done = parsed.get("files_done", None)
             current_files = parsed.get("current_files", [])
             error_count = parsed.get("error_count", 0)
-            wrapper_logs.info(f"Progress: {percent_done}% ({bytes_done}/{total_bytes} bytes, "
-                              f"{files_done}/{total_files} files)")
-            wrapper_logs.debug(f"Currently backing up: {', '.join(current_files)}")
-            wrapper_logs.debug(f"Error count: {error_count}")
+            logger.info(f"Progress: {percent_done}% ({bytes_done}/{total_bytes} bytes, "
+                        f"{files_done}/{total_files} files)")
+            logger.debug(f"Currently backing up: {', '.join(current_files)}")
+            logger.debug(f"Error count: {error_count}")
 
         elif parsed["message_type"] == "summary":
             files_new = parsed.get("files_new", "unknown")
@@ -142,27 +133,27 @@ def run_backup(args, unparsed_args):
             data_added = parsed.get("data_added", "unknown")
             total_duration = parsed.get("total_duration", "unknown")
             snapshot_id = parsed.get("snapshot_id", "(unknown?)")
-            wrapper_logs.info(f"Restic terminated in {total_duration} creating snapshot {snapshot_id}")
-            wrapper_logs.info(f"{files_new}/{files_changed}/{files_unmodified} new/changed/unmodified files")
-            wrapper_logs.info(f"{dirs_new}/{dirs_changed}/{dirs_unmodified} new/changed/unmodified directories")
-            wrapper_logs.info(f"{data_added} bytes added to the backup")
+            logger.info(f"Restic terminated in {total_duration} creating snapshot {snapshot_id}")
+            logger.info(f"{files_new}/{files_changed}/{files_unmodified} new/changed/unmodified files")
+            logger.info(f"{dirs_new}/{dirs_changed}/{dirs_unmodified} new/changed/unmodified directories")
+            logger.info(f"{data_added} bytes added to the backup")
 
     retcode = process.poll()
     if retcode != 0:
-        wrapper_logs.error(f"Restic terminated with error code {retcode}")
+        logger.error(f"Restic terminated with error code {retcode}")
     return retcode
 
 
 def main(args, unparsed_args):
     if args.command == "backup":
-        wrapper_logs.info("Backup command detected")
+        logger.info("Backup command detected")
 
         if not utils.battery_ok(args.skip_on_battery):
-            wrapper_logs.error("The laptop is on battery power, skipping backup")
+            logger.error("The laptop is on battery power, skipping backup")
             exit(return_codes["SKIP_CAUSE_BATTERY"])
 
         if not utils.network_ok(blacklist=args.wifi_blacklist, whitelist=args.wifi_whitelist):
-            wrapper_logs.error("Skipping backup because of network conditions")
+            logger.error("Skipping backup because of network conditions")
             exit(return_codes["SKIP_CAUSE_NETWORK"])
 
         utils.log_event_to_monitors("command_started", args.monitor_url,
@@ -176,11 +167,11 @@ def main(args, unparsed_args):
         utils.log_event_to_monitors(event, args.monitor_url, additional_data=additional_data)
 
     else:
-        restic_command = build_restic_command(args.command, args, additional_argparse_arguments=["tag"],
-                                              additional_unparsed_arguments=unparsed_args, force_json=False)
+        restic_command = utils.build_restic_command(args.command, args, additional_argparse_arguments=["tag"],
+                                                    additional_unparsed_arguments=unparsed_args, force_json=False)
         utils.log_event_to_monitors("command_started", args.monitor_url,
                                     additional_data={"command": args.command, "tag": args.tag})
-        process = run_command(restic_command)
+        process = utils.run_command(restic_command)
         returncode = process.returncode
 
         event = "command_succeeded"
