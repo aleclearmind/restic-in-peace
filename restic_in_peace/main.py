@@ -6,8 +6,9 @@ import signal
 import subprocess
 import time
 
-import utils
-from utils import logger
+from . import utils
+from . import description
+from .utils import logger
 
 return_codes = {
     "SKIP_CAUSE_BATTERY": -1,
@@ -16,8 +17,7 @@ return_codes = {
 }
 
 # WARN: boolean arguments must have action store_true, otherwise build_restic_command result will be incorrect
-argparser = argparse.ArgumentParser(description="Restic wrapper implementing missing features needed by Rev.ng",
-                                    epilog="Any other argument will get passed to restic as-is")
+argparser = argparse.ArgumentParser(description=description, epilog="Any other argument will get passed to restic as-is")
 argparser.add_argument("command", help="Restic command")
 
 # These options are specific of this tool and must not be passed to restic
@@ -43,15 +43,24 @@ argparser.add_argument("--password-command", help="Password command")
 def get_latest_snapshot_stats(args):
     get_latest_snapshot_command = utils.build_restic_command("snapshots", args, additional_argparse_arguments=["tag"])
     process = utils.run_command(get_latest_snapshot_command)
-    snapshots = json.loads(process.stdout)
-    if not snapshots:
+    try:
+        snapshots = json.loads(process.stdout)
+        if not snapshots:
+            return None, None
+    except json.JSONDecodeError:
+        logger.error("Unexpected error while parsing restic output as JSON while getting latest snapshot stats")
         return None, None
+
     snapshots.sort(key=lambda s: s["time"], reverse=True)
     latest_snapshot = snapshots[0]
 
     stats_command = utils.build_restic_command("stats", args, additional_unparsed_arguments=[latest_snapshot["id"]])
     process = utils.run_command(stats_command)
-    snapshot_stats = json.loads(process.stdout)
+    try:
+        snapshot_stats = json.loads(process.stdout)
+    except json.JSONDecodeError:
+        logger.error("Unexpected error while parsing restic output as JSON while getting latest snapshot stats")
+        return None, None
     return latest_snapshot, snapshot_stats
 
 
@@ -183,6 +192,10 @@ def main(args, unparsed_args):
     exit(returncode)
 
 
-if __name__ == "__main__":
+def entrypoint():
     arguments, remaining = argparser.parse_known_args()
     main(arguments, remaining)
+
+
+if __name__ == "__main__":
+    entrypoint()

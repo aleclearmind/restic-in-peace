@@ -8,7 +8,7 @@ and a custom wrapper to:
 * skip the backup on whitelisted/blacklisted networks
 * skip the backup on battery power
 
-Read `configure_laptop.md` for instructions on how to setup your laptop.
+Read `configure_laptop.md` for instructions on how to install it and setup your laptop.
 
 ## Restoring files and performing other operations
 

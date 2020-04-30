@@ -1,6 +1,6 @@
 {
     "global": {
-        "restic-binary": "/usr/local/bin/restic-in-peace.py"
+        "restic-binary": "restic-in-peace"
     },
     "common": {
         "added-size-limit": "5000000000",

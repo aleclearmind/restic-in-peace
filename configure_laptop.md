@@ -2,25 +2,32 @@
 
 ### Prerequisites
 
+**restic-in-peace**
+```bash
+python3 setup.py bdist_wheel
+pip3 install --user dist/restic_in_peace*.whl
+```
+
+Make sure your PATH includes `/home/<user>/.local/bin`:
+```
+# Add a line like this ~/.profile
+export PATH=$PATH:/home/<user>/.local/bin
+```
+You should set it in `~/.profile` and not in your `{bash|zsh}rc`, because systemd-timer will also need it.
+
 **resticprofile**
 ```bash
-curl -LO https://raw.githubusercontent.com/creativeprojects/resticprofile/master/install.s
+curl -LO https://raw.githubusercontent.com/creativeprojects/resticprofile/master/install.sh
 chmod +x install.sh
-sudo ./install.sh -b /usr/local/bin
+./install.sh -b ~/.local/bin
 ```
 
 **notify-send**
 
-It is packaged in most distros:
+Optional, needed to send desktop notifications. It is packaged by most distros:
 
 * Arch: `libnotify` 
 * Other distros: TODO
-
-**restic-in-peace.py**
-
-```bash
-TODO: package and writeup instructions
-```
 
 ### Configuration file
 
