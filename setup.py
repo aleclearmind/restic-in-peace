@@ -2,10 +2,10 @@
 
 from setuptools import setup, find_packages
 
-from restic_in_peace.main import description
+from restic_in_peace import description, version
 
 setup(name="restic-in-peace",
-      version="0.1",
+      version=version,
       description=description,
       url="https://rev.ng/gitlab/fcremo/restic-in-peace",
       author="fcremo",

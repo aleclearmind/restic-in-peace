@@ -8,9 +8,10 @@
         "wifi-whitelist": ["whitelisted-network"],
         "wifi-blacklist": ["blacklisted-network"],
         "monitor-url": ["https://<monitor_host>/restic"],
+        "desktop-notifications": true,
         "backup": {
-            "run-before": ["notify-send 'Starting backup...'"],
-            "run-after": ["notify-send 'Finished backup!'"],
+            "run-before": [],
+            "run-after": [],
             "check-after": true
         },
         "check": {},

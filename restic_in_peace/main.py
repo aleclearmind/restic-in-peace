@@ -6,8 +6,8 @@ import signal
 import subprocess
 import time
 
-from . import utils
 from . import description
+from . import utils
 from .utils import logger
 
 return_codes = {
@@ -17,7 +17,8 @@ return_codes = {
 }
 
 # WARN: boolean arguments must have action store_true, otherwise build_restic_command result will be incorrect
-argparser = argparse.ArgumentParser(description=description, epilog="Any other argument will get passed to restic as-is")
+argparser = argparse.ArgumentParser(description=description,
+                                    epilog="Any other argument will get passed to restic as-is")
 argparser.add_argument("command", help="Restic command")
 
 # These options are specific of this tool and must not be passed to restic
@@ -31,6 +32,11 @@ argparser.add_argument("--skip-on-battery", action="store_true",
                        help="Skip the backup if the computer is battery powered")
 argparser.add_argument("--monitor-url", action="append", default=[],
                        help="Perform an HTTP POST request to this URL to report events. Can be specified more than once")
+argparser.add_argument("--tee-restic-logs",
+                       help="Write restic output to this file. @CMD is substituted with the command, @FD with stdout or stderr")
+argparser.add_argument("--desktop-notifications", action="store_true",
+                       help="Send desktop notification using notify-send")
+argparser.add_argument("--loglevel", default="INFO", help="Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
 # Restic options which we need to parse to invoke commands other than the original one
 argparser.add_argument("--tag", action="append",
@@ -86,12 +92,12 @@ def run_backup(args, unparsed_args):
         next_line = process.stdout.readline()
         if next_line == "" and process.poll() is not None:
             break
-        logger.debug("RESTIC", next_line)
+        logger.log("RESTIC_OUT", next_line)
 
         try:
             parsed = json.loads(next_line)
         except json.JSONDecodeError:
-            logger.log("RESTIC", "Could not parse line as JSON")
+            logger.debug("Could not parse line as JSON")
             continue
 
         if parsed["message_type"] == "status" and parsed.get("action", "") == "scan_finished":
@@ -149,10 +155,19 @@ def run_backup(args, unparsed_args):
     retcode = process.poll()
     if retcode != 0:
         logger.error(f"Restic terminated with error code {retcode}")
+    logger.log("RESTIC_ERR", process.stderr.read())
     return retcode
 
 
 def main(args, unparsed_args):
+    if args.tee_restic_logs:
+        destination = args.tee_restic_logs.replace("@CMD", args.command)
+        stdout_destination = destination.replace("@FD", "stdout")
+        stderr_destination = destination.replace("@FD", "stderr")
+        logger.info(f"Appending restic stdout to {stdout_destination}, stderr to {stderr_destination}")
+        utils.logging.send_restic_output_to_file(stdout_destination)
+        utils.logging.send_restic_errors_to_file(stderr_destination)
+
     if args.command == "backup":
         logger.info("Backup command detected")
 
@@ -166,36 +181,71 @@ def main(args, unparsed_args):
 
         utils.log_event_to_monitors("command_started", args.monitor_url,
                                     additional_data={"command": args.command, "tag": args.tag})
+        if args.desktop_notifications:
+            utils.send_notification(f"Backup with tag {', '.join(args.tag)}", title="Backup started")
+
         returncode = run_backup(args, unparsed_args)
+
         event = "command_succeeded"
         additional_data = {"command": args.command, "tag": args.tag}
         if returncode:
             event = "command_failed"
             additional_data["returncode"] = returncode
         utils.log_event_to_monitors(event, args.monitor_url, additional_data=additional_data)
+
+        if args.desktop_notifications:
+            if returncode:
+                message = f"Backup with tag {', '.join(args.tag)} failed with code {returncode}"
+                title = "Backup failed"
+                urgency = "critical"
+            else:
+                message = f"Backup with tag {', '.join(args.tag)} succeeded"
+                title = "Backup succeeded"
+                urgency = "normal"
+            utils.send_notification(message, title, urgency=urgency)
 
     else:
         restic_command = utils.build_restic_command(args.command, args, additional_argparse_arguments=["tag"],
                                                     additional_unparsed_arguments=unparsed_args, force_json=False)
+
         utils.log_event_to_monitors("command_started", args.monitor_url,
-                                    additional_data={"command": args.command, "tag": args.tag})
+                                    additional_data={"command": args.command, "tag": args.tag, "repo": args.repo})
+        if args.desktop_notifications:
+            message = f"Restic {args.command} started on repo {args.repo}"
+            if args.tag:
+                message += f" with tag {', '.join(args.tag)}"
+            utils.send_notification(message)
+
         process = utils.run_command(restic_command)
+        logger.log("RESTIC_OUT", process.stdout)
+        logger.log("RESTIC_ERR", process.stderr)
         returncode = process.returncode
 
         event = "command_succeeded"
-        additional_data = {"command": args.command, "tag": args.tag}
+        additional_data = {"command": args.command, "tag": args.tag, "repo": args.repo}
         if returncode:
             event = "command_failed"
             additional_data["returncode"] = returncode
         utils.log_event_to_monitors(event, args.monitor_url, additional_data=additional_data)
+
+        if args.desktop_notifications:
+            if returncode:
+                title = f"Restic {args.command} failed"
+                message = f"Restic {args.command} failed with code {returncode}"
+                urgency = "critical"
+            else:
+                message = f"Restic {args.command} succeeded"
+                title = None
+                urgency = "normal"
+            message += f" on repo {args.repo}"
+            if args.tag:
+                message += f" with tag {', '.join(args.tag)}"
+            utils.send_notification(message, title=title, urgency=urgency)
 
     exit(returncode)
 
 
 def entrypoint():
     arguments, remaining = argparser.parse_known_args()
+    utils.logging.set_level(arguments.loglevel)
     main(arguments, remaining)
-
-
-if __name__ == "__main__":
-    entrypoint()

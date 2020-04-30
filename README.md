@@ -37,8 +37,7 @@ You can call `resticprofile` with any restic option like this:
 ```
 resticprofile -c ~/.config/backup/resticprofile.json --name <profile> [command] [--option, ...]
 ```
-
-Consult `man restic` for all your options.
+The restic options must come after the command! Refer to `man restic` for all commands and options.
 
 ## Disaster recovery
 

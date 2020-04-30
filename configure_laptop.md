@@ -57,17 +57,24 @@ These are the main parameters for specifying which data to backup:
 * `<profile>.backup.iexclude`: same as exclude, case insensitive
 * `<profile>.backup.exclude-if-present`: string or list of filenames that exclude a directory if it contains one of them (e.g. .do_not_backup, .git)
 
-These parameters are added by the custom wrapper:
+The configuration file syntax is quite self explanatory and largely reflects restic flags. 
+Read `man restic` and the configuration syntax reference [here](https://github.com/creativeprojects/resticprofile/#configuration-file-reference).
+Unrecognized flags will be passed to restic as-is.
+
+**restic-in-peace parameters**
+
+These parameters are added by restic-in-peace:
 
 * `common.added-size-limit`: abort the backup if the size of the files to be added to the backup is over this threshold
 * `common.skip-on-battery`: abort the backup if on battery power
 * `common.wifi-whitelist`: abort the backup if the computer is routed through a wifi network not matching one of the provided regexes
 * `common.wifi-blacklist`: abort the backup if the computer is routed through a wifi network matching one of the provided regexes
 * `common.monitor-url`: list of URLs that receive a POST with backup events
+* `common.desktop-notifications`: if true, use notify-send to notify of backup events
+* `common.tee-restic-logs`: useful to redirect restic output to a file.
 
-The configuration file syntax is quite self explanatory and largely reflects restic flags. 
-Read `man restic` and the configuration syntax reference [here](https://github.com/creativeprojects/resticprofile/#configuration-file-reference).
-Unrecognized flags will be passed to restic as-is.
+Read `restic-in-peace --help` for more details. Most options can be moved in more specific sections, 
+i.e. if you want to receive desktop notifications only for backup commands you can move the setting to `common.backup`. 
 
 ## Run the first backup
 
