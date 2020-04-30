@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import re
 import signal
 import subprocess
 import sys
@@ -11,6 +10,7 @@ import time
 from loguru import logger
 
 import utils
+from command import build_restic_command, run_command
 
 logger.configure(handlers=[
     {"sink": sys.stdout, "format": "<level>{time}|{level}|{extra[logger_name]}|{message}</level>", "level": "INFO"}
@@ -24,66 +24,29 @@ return_codes = {
     "ABORT_TOO_MUCH_DATA": -3,
 }
 
-# WARN: boolean arguments must have action store_true, otherwise build_restic_args result will be incorrect
+# WARN: boolean arguments must have action store_true, otherwise build_restic_command result will be incorrect
 argparser = argparse.ArgumentParser(description="Restic wrapper implementing missing features needed by Rev.ng",
                                     epilog="Any other argument will get passed to restic as-is")
 argparser.add_argument("command", help="Restic command")
 
 # These options are specific of this tool and must not be passed to restic
-argparser.add_argument("--added-size-limit", type=int, help="Maximim number of new bytes to backup. If restic counts more than this, the backup is aborted")
-argparser.add_argument("--wifi-whitelist", action="extend", nargs="+",
-                       help="Skip the backup if this parameter is provided and the computer is not connected to a network matching one of the provided regexes")
-argparser.add_argument("--wifi-blacklist", action="extend", nargs="+",
-                       help="Skip the backup if the computer is connected to a network matching one of the provided regexes")
+argparser.add_argument("--added-size-limit", type=int,
+                       help="Maximim number of new bytes to backup. If restic counts more than this, the backup is aborted")
+argparser.add_argument("--wifi-whitelist", action="append", default=[],
+                       help="Skip the backup if this parameter is provided and the computer is not connected to a network matching one of the provided regexes. Can be speficied more than once")
+argparser.add_argument("--wifi-blacklist", action="append", default=[],
+                       help="Skip the backup if the computer is connected to a network matching one of the provided regexes. Can be specified more than once")
 argparser.add_argument("--skip-on-battery", action="store_true",
                        help="Skip the backup if the computer is battery powered")
+argparser.add_argument("--monitor-url", action="append", default=[],
+                       help="Perform an HTTP POST request to this URL to report events. Can be specified more than once")
 
 # Restic options which we need to parse to invoke commands other than the original one
-argparser.add_argument("--tag",
-                       help="Only the latest snapshot having this tag will be considered as baseline. Supplying this option is highly recommended",
-                       action="append")
+argparser.add_argument("--tag", action="append",
+                       help="Only the latest snapshot having this tag will be considered as baseline. Supplying this option is highly recommended")
 argparser.add_argument("--repo", "-r", help="Restic repository")
 argparser.add_argument("--password-file", "-p", help="Password file")
 argparser.add_argument("--password-command", help="Password command")
-
-# Global args which are get passed all invocations of restic
-global_arguments = ["repo", "password_file", "password_command"]
-
-
-def build_restic_command(command, args,
-                         additional_argparse_arguments=None,
-                         additional_unparsed_arguments=None,
-                         force_json=True):
-    additional_unparsed_arguments = additional_unparsed_arguments or []
-    additional_argparse_arguments = additional_argparse_arguments or []
-
-    restic_args = ["restic", command]
-
-    for name in global_arguments + additional_argparse_arguments:
-        val = vars(args).get(name, None)
-        # Assumption: a False value is equivalent to not specifying a flag
-        if val is False or val is None:
-            continue
-
-        restic_args.append("--" + name.replace("_", "-"))
-        if isinstance(val, (str, int)):
-            val = str(val)
-        elif isinstance(val, list):
-            val = " ".join(str(v) for v in val)
-        elif val is True:
-            continue
-        else:
-            error = f"Argument {name} is not string, int or list or True (actual type {type(val)})"
-            wrapper_logs.error(error)
-            raise TypeError(error)
-        restic_args.append(val)
-
-    restic_args += additional_unparsed_arguments
-
-    if force_json and "--json" not in restic_args:
-        restic_args.append("--json")
-
-    return restic_args
 
 
 def get_latest_snapshot_stats(args):
@@ -99,34 +62,6 @@ def get_latest_snapshot_stats(args):
     process = utils.run_command(stats_command)
     snapshot_stats = json.loads(process.stdout)
     return latest_snapshot, snapshot_stats
-
-
-def battery_ok(args):
-    return not (args.skip_on_battery and utils.on_battery())
-
-
-def network_ok(args):
-    if args.wifi_blacklist:
-        current_network = utils.get_wifi_network()
-        if current_network is not None:
-            for pattern in args.wifi_blacklist:
-                if re.search(pattern, current_network):
-                    wrapper_logs.info(f"Network {current_network} is blacklisted")
-                    return False
-
-    if args.wifi_whitelist:
-        current_network = utils.get_wifi_network()
-        if current_network is not None:
-            for pattern in args.wifi_whitelist:
-                if re.search(pattern, current_network):
-                    wrapper_logs.info(f"Network {current_network} is whitelisted")
-                    return True
-            else:
-                wrapper_logs.info(f"Network {current_network} is not in the whitelist")
-                return False
-
-    wrapper_logs.info(f"The computer default route does not appear to be a wireless network")
-    return True
 
 
 def run_backup(args, unparsed_args):
@@ -156,8 +91,8 @@ def run_backup(args, unparsed_args):
         try:
             parsed = json.loads(next_line)
         except json.JSONDecodeError:
-            # wrapper_logs.debug("Could not parse line as JSON")
-            # wrapper_logs.debug(next_line)
+            wrapper_logs.debug("Could not parse line as JSON")
+            wrapper_logs.debug(next_line)
             continue
 
         if parsed["message_type"] == "status" and parsed.get("action", "") == "scan_finished":
@@ -181,7 +116,8 @@ def run_backup(args, unparsed_args):
                     process.kill()
                     process.wait()
 
-                exit(return_codes["ABORT_TOO_MUCH_DATA"])
+                # TODO: maybe it would be better to raise an exception, so the return value would be unambiguous
+                return return_codes["ABORT_TOO_MUCH_DATA"]
 
         elif parsed["message_type"] == "status" and scan_finished:
             percent_done = int(parsed.get("percent_done", 0) * 100)
@@ -214,28 +150,47 @@ def run_backup(args, unparsed_args):
     retcode = process.poll()
     if retcode != 0:
         wrapper_logs.error(f"Restic terminated with error code {retcode}")
-        exit(retcode)
+    return retcode
 
 
 def main(args, unparsed_args):
     if args.command == "backup":
         wrapper_logs.info("Backup command detected")
 
-        if not battery_ok(args):
+        if not utils.battery_ok(args.skip_on_battery):
             wrapper_logs.error("The laptop is on battery power, skipping backup")
             exit(return_codes["SKIP_CAUSE_BATTERY"])
 
-        if not network_ok(args):
+        if not utils.network_ok(blacklist=args.wifi_blacklist, whitelist=args.wifi_whitelist):
             wrapper_logs.error("Skipping backup because of network conditions")
             exit(return_codes["SKIP_CAUSE_NETWORK"])
 
-        run_backup(args, unparsed_args)
+        utils.log_event_to_monitors("command_started", args.monitor_url,
+                                    additional_data={"command": args.command, "tag": args.tag})
+        returncode = run_backup(args, unparsed_args)
+        event = "command_succeeded"
+        additional_data = {"command": args.command, "tag": args.tag}
+        if returncode:
+            event = "command_failed"
+            additional_data["returncode"] = returncode
+        utils.log_event_to_monitors(event, args.monitor_url, additional_data=additional_data)
 
     else:
         restic_command = build_restic_command(args.command, args, additional_argparse_arguments=["tag"],
                                               additional_unparsed_arguments=unparsed_args, force_json=False)
-        child = subprocess.Popen(restic_command)
-        child.wait()
+        utils.log_event_to_monitors("command_started", args.monitor_url,
+                                    additional_data={"command": args.command, "tag": args.tag})
+        process = run_command(restic_command)
+        returncode = process.returncode
+
+        event = "command_succeeded"
+        additional_data = {"command": args.command, "tag": args.tag}
+        if returncode:
+            event = "command_failed"
+            additional_data["returncode"] = returncode
+        utils.log_event_to_monitors(event, args.monitor_url, additional_data=additional_data)
+
+    exit(returncode)
 
 
 if __name__ == "__main__":

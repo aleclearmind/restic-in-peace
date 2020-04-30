@@ -1,14 +1,16 @@
 import glob
-import subprocess
-import sys
 import re
+import sys
 
+import requests
 from loguru import logger
 
+from command import run_command
+
 logger.configure(handlers=[
-    {"sink": sys.stdout, "format": "<level>{time}|{level}|{extra[logger_name]}|{message}</level>", "level": "ERROR"}
+    {"sink": sys.stdout, "format": "<level>{time}|{level}|{extra[logger_name]}|{message}</level>", "level": "INFO"}
 ])
-utils_logs = logger.bind(logger_name="utils")
+log = logger.bind(logger_name="utils")
 
 
 def on_battery():
@@ -18,12 +20,6 @@ def on_battery():
             if status.strip() == "Discharging":
                 return True
     return False
-
-
-def run_command(args, shell=False):
-    utils_logs.debug(f"About to execute {args}")
-    process = subprocess.run(args, capture_output=True, universal_newlines=True, shell=shell)
-    return process
 
 
 def get_active_network_interface(for_ip="1.1.1.1"):
@@ -54,20 +50,62 @@ def get_wifi_network():
     essid_regex = re.compile('ESSID:"(?P<essid>[^"]*)"')
     interface = get_active_network_interface()
     if interface is None:
-        utils_logs.error("Could not determine default network interface")
+        log.error("Could not determine default network interface")
         return
 
     wifi_interfaces_regex = re.compile(r"wlp\ds\d|wlan\d|wifi\d")
     if wifi_interfaces_regex.match(interface) is None:
-        utils_logs.info(f"Default interface {interface} was not determined to be wifi")
+        log.info(f"Default interface {interface} was not determined to be wifi")
         return
 
     process = run_command(f"iwconfig {interface}", shell=True)
     match = essid_regex.search(process.stdout)
     if match is None:
-        utils_logs.error(f"Could not determine network for interface {interface}")
+        log.error(f"Could not determine network for interface {interface}")
         return
     else:
         network = match.group("essid")
-        utils_logs.info(f"Interface {interface} is connected to {network}")
+        log.info(f"Interface {interface} is connected to {network}")
         return network
+
+
+def battery_ok(skip_on_battery):
+    if skip_on_battery:
+        return not on_battery()
+    else:
+        return True
+
+
+def network_ok(blacklist=[], whitelist=[]):
+    current_network = get_wifi_network()
+    if current_network is None:
+        log.info(f"The computer default route does not appear to be a wireless network")
+        return True
+
+    for pattern in blacklist:
+        if re.search(pattern, current_network):
+            log.info(f"Network {current_network} is blacklisted")
+            return False
+
+    if not whitelist:
+        log.info(f"Network {current_network} is not blacklisted and no whitelist supplied, continuing...")
+        return True
+
+    for pattern in whitelist:
+        if re.search(pattern, current_network):
+            log.info(f"Network {current_network} is whitelisted")
+            return True
+    else:
+        log.info(f"Network {current_network} is not in the whitelist")
+        return False
+
+
+def log_event_to_monitors(event, monitor_urls, additional_data={}):
+    for url in monitor_urls:
+        data = {"event": event}
+        data.update(additional_data)
+        try:
+            r = requests.post(url, data=data, timeout=5)
+        except requests.exceptions.RequestException as e:
+            # TODO: this leaks the full URL to the logs, maybe we should parse it and use only the host
+            log.error(f"Exception while connecting to {url}: {e}")

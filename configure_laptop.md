@@ -24,7 +24,8 @@ TODO: package and writeup instructions
 
 ### Configuration file
 
-Choose a strong password (e.g. `head -c 16 /dev/urandom | xxd -p`) and put it in `~/.config/backup/restic_password`. **Also save the password off of your machine and/or print it**.
+Choose a strong password (e.g. `head -c 16 /dev/urandom | xxd -p`) and put it in `~/.config/backup/restic_password`.
+**Also save the password off of your machine and/or print it**.
 
 Create a folder in your home which will hold your configuration file
 ```
@@ -55,6 +56,7 @@ These parameters are added by the custom wrapper:
 * `common.skip-on-battery`: abort the backup if on battery power
 * `common.wifi-whitelist`: abort the backup if the computer is routed through a wifi network not matching one of the provided regexes
 * `common.wifi-blacklist`: abort the backup if the computer is routed through a wifi network matching one of the provided regexes
+* `common.monitor-url`: list of URLs that receive a POST with backup events
 
 The configuration file syntax is quite self explanatory and largely reflects restic flags. 
 Read `man restic` and the configuration syntax reference [here](https://github.com/creativeprojects/resticprofile/#configuration-file-reference).
