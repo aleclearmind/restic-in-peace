@@ -4,6 +4,8 @@ from setuptools import setup, find_packages
 
 from restic_in_peace import description, version
 
+requirements = open("requirements.txt").readlines()
+
 setup(name="restic-in-peace",
       version=version,
       description=description,
@@ -13,7 +15,7 @@ setup(name="restic-in-peace",
       license="TODO",
       packages=find_packages(),
       zip_safe=False,
-      install_requires=["loguru", "requests"],
+      install_requires=requirements,
       entry_points={
             "console_scripts": ["restic-in-peace=restic_in_peace.main:entrypoint"]
       }

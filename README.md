@@ -19,14 +19,15 @@ you can mount a read-only copy of the backup using FUSE. You will find all the s
 ```
 resticprofile -c ~/.config/backup/resticprofile.json --name <profile> mount /mount/point
 ```
+Sometimes the virtual filesystem is not properly unmounted. Calling the `mount` command again will unmount it.
 
-You might also want to restore files directly. First you need to find the snapshot you're interested in:
+If you want to restore files directly, you first need to find the snapshot that contains them
 ```
 resticprofile -c ~/.config/backup/resticprofile.json --name <profile> snapshots 
 ```
-You can also use the special snapshot id `latest`. 
+You can also use the special snapshot id `latest`.
 
-Use the `restore` command to extract some files (in this case, to `target_dir`)
+Use the `restore` command to extract some files
 ```
 resticprofile -c ~/.config/backup/resticprofile.json    \
     --name <profile> restore <snapshot_id>              \
@@ -35,7 +36,9 @@ resticprofile -c ~/.config/backup/resticprofile.json    \
     --verify
 ```
 
-You can call `resticprofile` with any restic option like this:
+### Other commands
+
+You can call `resticprofile` with any restic and restic-in-peace option like this
 ```
 resticprofile -c ~/.config/backup/resticprofile.json --name <profile> [command] [--option, ...]
 ```

@@ -1,3 +1,4 @@
+import signal
 import subprocess
 
 from .logging import logger
@@ -12,12 +13,12 @@ def run_command(args, shell=False):
 def build_restic_command(command, args_from_argparse,
                          additional_argparse_arguments=None,
                          additional_unparsed_arguments=None,
-                         force_json=True):
+                         force_json=False, force_verbose=False):
     additional_unparsed_arguments = additional_unparsed_arguments or []
     additional_argparse_arguments = additional_argparse_arguments or []
 
     # Global args_from_argparse which are get passed all invocations of restic
-    global_arguments = ["repo", "password_file", "password_command"]
+    global_arguments = ["repo", "password_file", "password_command", "verbose"]
 
     restic_args = ["restic", command]
 
@@ -45,4 +46,29 @@ def build_restic_command(command, args_from_argparse,
     if force_json and "--json" not in restic_args:
         restic_args.append("--json")
 
+    if force_json and "--verbose" not in restic_args:
+        restic_args.append("--json")
+
     return restic_args
+
+
+class EnsureGracefulExit:
+    def __init__(self, subproc, timeout=10):
+        self.subprocess: subprocess.Popen = subproc
+        self.timeout = timeout
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.subprocess.poll():
+            return
+
+        # TODO: should we terminate the subprocess with other signals/exceptions?
+        if exc_type is KeyboardInterrupt:
+            self.subprocess.send_signal(signal.SIGINT)
+            self.subprocess.wait(timeout=self.timeout)
+            if self.subprocess.poll() is None:
+                self.subprocess.kill()
+                self.subprocess.wait()
+            return True

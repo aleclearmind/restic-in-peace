@@ -22,13 +22,6 @@ chmod +x install.sh
 ./install.sh -b ~/.local/bin
 ```
 
-**notify-send**
-
-Optional, needed to send desktop notifications. It is packaged by most distros:
-
-* Arch: `libnotify` 
-* Other distros: TODO
-
 ### Configuration file
 
 Choose a strong password (e.g. `head -c 16 /dev/urandom | xxd -p`) and put it in `~/.config/backup/restic_password`.
@@ -46,7 +39,8 @@ Each profile should have at least one unique tag, this is needed by the wrapper 
 snapshots when computing the size increase from the previous backup.
  
 The bare minimum modifications you need are specifying which data to backup and the repo it should be backed up to.
-Your friendly sysadmin will give you the backup repo URL, which you'll need to set in `common.repository`.
+Your friendly sysadmin will give you the backup repo URL, which you'll need to set in `common.repository`. 
+For example, a repo url might be `sftp:host:path`.
 You'll also need to update `global.restic-binary` to wherever you install `restic-in-peace` 
 (there seems to be a bug where the binary is not found even if it is in the path).
 
@@ -80,9 +74,9 @@ i.e. if you want to receive desktop notifications only for backup commands you c
 
 ## Run the first backup
 
-Run the first backup with an increased size limit, otherwise the backup will likely abort due to the limit in the configuration.
+If you configured a sensible size limit in your configuration the first backup will likely abort due to the limit in the configuration. A size limit of 0 overrides the watchdog.
 ```
-resticprofile -c ~/.config/backup/resticprofile.json --name <profile> --added-size-limit 200000000000 backup
+resticprofile -c ~/.config/backup/resticprofile.json --name <profile> --added-size-limit 0 backup
 ``` 
 
 Re-run the backup. This should take much less time

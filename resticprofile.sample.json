@@ -1,6 +1,7 @@
 {
     "global": {
-        "restic-binary": "/home/<user>/.local/bin/restic-in-peace"
+        "restic-binary": "/home/<user>/.local/bin/restic-in-peace",
+        "init": true
     },
     "common": {
         "added-size-limit": "5000000000",
@@ -8,13 +9,13 @@
         "wifi-whitelist": ["whitelisted-network"],
         "wifi-blacklist": ["blacklisted-network"],
         "monitor-url": ["https://<monitor_host>/restic"],
-        "desktop-notifications": true,
         "backup": {
             "run-before": [],
             "run-after": [],
-            "check-after": true
+            "check-after": true,
+            "desktop-notifications": true
         },
-        "check": {},
+        "check": { "desktop-notifications": true },
         "password-file": "~/.config/backup/restic_password",
         "repository": "<repo_path_or_url>",
         "retention": {
@@ -23,7 +24,8 @@
             "keep-weekly": "4",
             "keep-monthly": "6",
             "keep-yearly": "1",
-            "prune": true
+            "prune": true,
+            "desktop-notifications": true
         }
     },
     "profile_1": {

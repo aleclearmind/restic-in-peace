@@ -1,8 +1,14 @@
+import io
+import os
 import sys
+import threading
+import time
+from typing import List
 
 from loguru import logger
 
 levels = {
+    "TRACE": 5,
     "DEBUG": 10,
     "RESTIC": 10,
     "INFO": 20,
@@ -35,14 +41,59 @@ class ExactLevelFilter:
             return record["level"].name == self.level
 
 
-global_filter = MinimumLevelFilter("INFO")
+class LoggingTextIOWrapper:
+    def __init__(self, wrapped: io.TextIOBase, loglevel, close_wrapped_object=False, encoding="utf-8"):
+        self.wrapped: io.TextIOBase = wrapped
+        self.loglevel = loglevel
+        self.pipe_r, self.pipe_w = os.pipe()
+        self.thread = threading.Thread(target=self.mirror)
+        self.thread.start()
+        self.closed = False
+        self.close_wrapped_object = close_wrapped_object
+        self.encoding = encoding
 
-logger.configure(handlers=[
-    {"sink": sys.stdout, "filter": global_filter,
-     "format": "<level>{time}|{level}|{module}|{message}</level>", "level": 0}
-])
-logger.level("RESTIC_OUT", no=logger.level("DEBUG").no, color=logger.level("DEBUG").color)
-logger.level("RESTIC_ERR", no=logger.level("DEBUG").no, color=logger.level("DEBUG").color)
+    def mirror(self):
+        data = os.read(self.pipe_r, 1024 * 1024)
+        while not self.closed or data:
+            if data:
+                logger.log(self.loglevel, data.decode(self.encoding))
+                os.write(self.wrapped.fileno(), data)
+            # Windows does not support select() on pipes
+            time.sleep(0.1)
+            data = os.read(self.pipe_r, 1024 * 1024)
+
+    def write(self, s: str) -> int:
+        logger.log(self.loglevel, s)
+        return self.wrapped.write(s)
+
+    def writelines(self, lines: List[str]) -> None:
+        for line in lines:
+            logger.log(self.loglevel, line)
+        return self.wrapped.writelines(lines)
+
+    def fileno(self) -> int:
+        return self.pipe_w
+
+    def close(self) -> None:
+        os.close(self.pipe_w)
+        self.closed = True
+        self.thread.join()
+        if self.close_wrapped_object:
+            self.wrapped.close()
+        os.close(self.pipe_r)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return True
+
+    def readable(self):
+        return False
+
+    def writable(self):
+        return not self.closed and self.wrapped.writable()
 
 
 def set_level(level):
@@ -53,11 +104,31 @@ def set_level(level):
     global_filter.level = level
 
 
-def send_restic_output_to_file(file):
-    restic_out_only_filter = ExactLevelFilter("RESTIC_OUT")
-    logger.add(file, level=0, filter=restic_out_only_filter, format="{message}")
+def send_log_to_file(file, filter=None, level=0, format="{message}", truncate=True):
+    if truncate and os.path.exists(file):
+        os.truncate(file, 0)
+    logger.add(file, level=level, filter=filter, format=format)
 
 
-def send_restic_errors_to_file(file):
-    restic_err_only_filter = ExactLevelFilter("RESTIC_ERR")
-    logger.add(file, level=0, filter=restic_err_only_filter, format="{message}")
+def send_restic_output_to_file(file, truncate=True):
+    send_log_to_file(file, filter=restic_out_only_filter, truncate=truncate)
+
+
+def send_restic_errors_to_file(file, truncate=True):
+    send_log_to_file(file, filter=restic_err_only_filter, truncate=truncate)
+
+
+global_filter = MinimumLevelFilter("INFO")
+restic_out_only_filter = ExactLevelFilter("RESTIC_OUT")
+restic_err_only_filter = ExactLevelFilter("RESTIC_ERR")
+
+logger.level("RESTIC_OUT", no=logger.level("TRACE").no, color=logger.level("TRACE").color)
+logger.level("RESTIC_ERR", no=logger.level("TRACE").no, color=logger.level("TRACE").color)
+
+logger.configure(handlers=[
+    {
+        "sink": sys.stdout, "level": 0,
+        "format": "<level>{time}|{level}|{module}|{message}</level>",
+        "filter": global_filter
+    }
+])
