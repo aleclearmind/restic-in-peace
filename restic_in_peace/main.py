@@ -155,7 +155,7 @@ def run_backup(args, unparsed_args):
                 if current_files:
                     logger.debug(f"Currently backing up: {', '.join(current_files)}")
 
-                if args.desktop_notifications:
+                if args.desktop_notifications and utils.logging.ratelimit(topic="progress-notification", threshold=0.1):
                     bytes_done_readable = utils.to_si_units(bytes_done)
                     total_bytes_readable = utils.to_si_units(total_bytes)
                     utils.show_notification(f"Backup in progress... ({status})",
