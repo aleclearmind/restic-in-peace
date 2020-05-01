@@ -5,4 +5,4 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/resticprofile -c $HOME/.config/backup/resticprofile.json --name %i backup
+ExecStart=/usr/local/bin/resticprofile -c .config/backup/resticprofile.json --name %i backup

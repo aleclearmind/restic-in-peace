@@ -17,19 +17,19 @@ Read `configure_laptop.md` for instructions on how to install it and setup your 
 If you need just a couple of files or you want to explore multiple backups to search for the point in time where a file was not damaged 
 you can mount a read-only copy of the backup using FUSE. You will find all the snapshots, organized by timestamp, tag, id and hostname.
 ```
-resticprofile -c ~/.config/backup/resticprofile.json --name <profile> mount /mount/point
+resticprofile -c resticprofile.json --name <profile> mount /mount/point
 ```
 Sometimes the virtual filesystem is not properly unmounted. Calling the `mount` command again will unmount it.
 
 If you want to restore files directly, you first need to find the snapshot that contains them
 ```
-resticprofile -c ~/.config/backup/resticprofile.json --name <profile> snapshots 
+resticprofile -c resticprofile.json --name <profile> snapshots 
 ```
 You can also use the special snapshot id `latest`.
 
 Use the `restore` command to extract some files
 ```
-resticprofile -c ~/.config/backup/resticprofile.json    \
+resticprofile -c resticprofile.json                     \
     --name <profile> restore <snapshot_id>              \
     --include <path> --include <otherpath>              \
     --target <target_dir>                               \
@@ -40,7 +40,7 @@ resticprofile -c ~/.config/backup/resticprofile.json    \
 
 You can call `resticprofile` with any restic and restic-in-peace option like this
 ```
-resticprofile -c ~/.config/backup/resticprofile.json --name <profile> [command] [--option, ...]
+resticprofile -c resticprofile.json --name <profile> [command] [--option, ...]
 ```
 The restic options must come after the command! Refer to `man restic` for all commands and options.
 
@@ -52,5 +52,5 @@ TODO: write this up when we've determined which offsite storag will be used
 
 This is probably due to a stale lock, for example due to connectivity loss. Ensure no restic process is running, then remove the lock using
 ```
-resticprofile -c ~/.config/backup/resticprofile.json --name <profile> unlock
+resticprofile -c resticprofile.json --name <profile> unlock
 ```

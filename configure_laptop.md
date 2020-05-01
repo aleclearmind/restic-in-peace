@@ -22,6 +22,10 @@ chmod +x install.sh
 ./install.sh -b ~/.local/bin
 ```
 
+**restic**
+
+It's packaged for most distros, just install it from there.
+
 ### Configuration file
 
 Choose a strong password (e.g. `head -c 16 /dev/urandom | xxd -p`) and put it in `~/.config/backup/restic_password`.
@@ -76,12 +80,12 @@ i.e. if you want to receive desktop notifications only for backup commands you c
 
 If you configured a sensible size limit in your configuration the first backup will likely abort due to the limit in the configuration. A size limit of 0 overrides the watchdog.
 ```
-resticprofile -c ~/.config/backup/resticprofile.json --name <profile> --added-size-limit 0 backup
+resticprofile -c resticprofile.json --name <profile> --added-size-limit 0 backup
 ``` 
 
 Re-run the backup. This should take much less time
 ```
-resticprofile -c ~/.config/backup/resticprofile.json --name <profile> backup
+resticprofile -c resticprofile.json --name <profile> backup
 ```
 
 ## Automation with systemd-timer
@@ -105,7 +109,7 @@ First check the backup consistency. This does not read data, unless the `--read-
 This check is also run after every backup, it should **never** fail.
 
 ```
-resticprofile -c ~/.config/backup/resticprofile.json --name <profile> check
+resticprofile -c resticprofile.json --name <profile> check
 ```
 
 You should mount the backup and inspect it to ensure your important stuff is actually being backed up.
