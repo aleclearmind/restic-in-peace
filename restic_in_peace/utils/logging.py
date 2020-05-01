@@ -104,6 +104,14 @@ def set_level(level):
     global_filter.level = level
 
 
+def ratelimit(topic="", threshold=1, update=True):
+    last_message_timestamp = topic_timestamps.get(topic, 0)
+    ratelimit_ok = last_message_timestamp + threshold < time.time()
+    if ratelimit_ok and update:
+        topic_timestamps[topic] = time.time()
+    return ratelimit_ok
+
+
 def send_log_to_file(file, filter=None, level=0, format="{message}", truncate=True):
     if truncate and os.path.exists(file):
         os.truncate(file, 0)
@@ -118,6 +126,7 @@ def send_restic_errors_to_file(file, truncate=True):
     send_log_to_file(file, filter=restic_err_only_filter, truncate=truncate)
 
 
+topic_timestamps = {}
 global_filter = MinimumLevelFilter("INFO")
 restic_out_only_filter = ExactLevelFilter("RESTIC_OUT")
 restic_err_only_filter = ExactLevelFilter("RESTIC_ERR")

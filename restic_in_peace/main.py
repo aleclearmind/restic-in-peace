@@ -150,7 +150,8 @@ def run_backup(args, unparsed_args):
                 message = f"Progress: {status} ({bytes_done}/{total_bytes} bytes, " \
                           f"{files_done}/{total_files} files, " \
                           f"{error_count} errors)"
-                logger.info(message)
+                if utils.logging.ratelimit(topic="progress"):
+                    logger.info(message)
                 if current_files:
                     logger.debug(f"Currently backing up: {', '.join(current_files)}")
 
