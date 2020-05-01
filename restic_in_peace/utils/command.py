@@ -46,8 +46,9 @@ def build_restic_command(command, args_from_argparse,
     if force_json and "--json" not in restic_args:
         restic_args.append("--json")
 
-    if force_json and "--verbose" not in restic_args:
-        restic_args.append("--json")
+    if force_verbose and "--verbose" not in restic_args:
+        restic_args.append("--verbose")
+        restic_args.append("2")
 
     return restic_args
 

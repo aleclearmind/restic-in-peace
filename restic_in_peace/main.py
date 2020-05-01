@@ -45,7 +45,7 @@ argparser.add_argument("--tag", action="append",
 argparser.add_argument("--repo", "-r", help="Restic repository")
 argparser.add_argument("--password-file", "-p", help="Password file")
 argparser.add_argument("--password-command", help="Password command")
-argparser.add_argument("--verbose", "-v", help="Verbose output (passed to restic, for this wrapper use --loglevel)")
+argparser.add_argument("--verbose", "-v", nargs="?", help="Verbose output (passed to restic, for this wrapper use --loglevel)")
 
 
 def get_latest_snapshot_stats(args):
