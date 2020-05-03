@@ -35,7 +35,7 @@ def get_wifi_network():
         logger.error("Could not determine default network interface")
         return
 
-    wifi_interfaces_regex = re.compile(r"wlp\ds\d|wlan\d|wifi\d")
+    wifi_interfaces_regex = re.compile(r"wlp\d+s\d+|wlan\d+|wifi\d+")
     if wifi_interfaces_regex.match(interface) is None:
         logger.info(f"Default interface {interface} was not determined to be wifi")
         return
