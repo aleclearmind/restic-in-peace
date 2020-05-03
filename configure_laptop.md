@@ -50,11 +50,14 @@ cp resticprofile.sample.json ~/.config/restic-in-peace/resticprofile.json
 
 You can create multiple profiles to backup different data with different frequencies, retention policies, etc.
 In the example file there is only one profile which inherits some properties from the `common` profile.
-Each profile should have at least one unique tag, this is needed by the wrapper to grab the correct snapshots when computing the size increase from the previous backup.
+Each profile should have a unique tag (i.e. the name of the profile). This is needed by restic-in-peace to grab the 
+correct snapshots when computing the size increase from the previous backup.
 
 The bare minimum modifications you need are specifying which data to backup and the repo it should be backed up to.
 Your friendly sysadmin will give you the backup repo URL, which you'll need to set in `common.repository`.
-For example, a repo url might be `sftp:host:path`.
+If you want to experiment, you can use your own repo with local path like `/mnt/backups` or a URL such as `sftp:host:path`.
+Restic supports many backends, [find the whole list here](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html).
+
 You'll also need to update `global.restic-binary` to wherever you install `restic-in-peace`
 (there seems to be a bug where the binary is not found even if it is in the path).
 
@@ -86,6 +89,11 @@ These parameters are added by restic-in-peace:
 Read `restic-in-peace --help` for more details. Most options can be moved in more specific sections, i.e. if you want to receive desktop notifications only for backup commands you can move the setting to `common.backup`.
 
 # Run the first backup
+
+Initialize the repository with:
+```
+resticprofile -c resticprofile.json --name <profile> init
+```
 
 If you configured a sensible size limit in your configuration the first backup will likely abort due to the limit in the configuration. A size limit of 0 overrides the watchdog.
 
