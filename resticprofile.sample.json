@@ -16,7 +16,7 @@
             "desktop-notifications": true
         },
         "check": { "desktop-notifications": true },
-        "password-file": "~/.config/backup/restic_password",
+        "password-file": "~/.config/restic-in-peace/restic_password",
         "repository": "<repo_path_or_url>",
         "retention": {
             "after-backup": true,

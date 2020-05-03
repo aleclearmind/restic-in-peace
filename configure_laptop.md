@@ -36,8 +36,8 @@ It's packaged for most distros, just install it from there.
 Choose a strong password:
 
 ```bash
-mkdir -p ~/.config/backup
-head -c 16 /dev/urandom | base64 | sed 's/=//g' > ~/.config/backup/restic_password
+mkdir -p ~/.config/restic-in-peace
+head -c 16 /dev/urandom | base64 | sed 's/=//g' > ~/.config/restic-in-peace/restic_password
 ```
 
 **Also save the password off of your machine and/or print it**.
@@ -45,7 +45,7 @@ head -c 16 /dev/urandom | base64 | sed 's/=//g' > ~/.config/backup/restic_passwo
 Create a folder in your home which will hold your configuration file
 
 ```
-cp resticprofile.sample.json ~/.config/backup/resticprofile.json
+cp resticprofile.sample.json ~/.config/restic-in-peace/resticprofile.json
 ```
 
 You can create multiple profiles to backup different data with different frequencies, retention policies, etc.
@@ -91,7 +91,7 @@ If you configured a sensible size limit in your configuration the first backup w
 
 ```
 resticprofile \
-    -c .config/backup/resticprofile.json \
+    -c .config/restic-in-peace/resticprofile.json \
      --name <profile> \
      --added-size-limit 0 \
      backup
