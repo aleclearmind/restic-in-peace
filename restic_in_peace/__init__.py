@@ -1,2 +1,2 @@
-description = "Restic wrapper implementing missing features needed by Rev.ng"
+description = "Restic wrapper implementing missing features needed by rev.ng"
 version = "0.1.0"
