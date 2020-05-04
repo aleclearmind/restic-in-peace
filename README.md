@@ -62,3 +62,5 @@ This is probably due to a stale lock, for example due to connectivity loss. Ensu
 ```
 resticprofile -c resticprofile.json --name <profile> unlock
 ```
+
+If this does not work, run with `--loglevel DEBUG` or `--loglevel TRACE` at the end of the command to see more output.
