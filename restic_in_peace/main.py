@@ -8,6 +8,7 @@ import sys
 
 from . import description
 from . import utils
+from .utils import human_numbers
 from .utils import logger
 
 return_codes = {
@@ -23,13 +24,15 @@ argparser = argparse.ArgumentParser(description=description,
 argparser.add_argument("command", help="Restic command")
 
 # These options are specific of this tool and must not be passed to restic
-argparser.add_argument("--added-size-limit", type=int,
+argparser.add_argument("--added-size-limit", type=human_numbers.parse,
                        help="Maximim number of new bytes to backup. If restic counts more than this, the backup is aborted")
 argparser.add_argument("--wifi-whitelist", action="append", default=[],
                        help="Skip the backup if this parameter is provided and the computer is not connected to a network matching one of the provided regexes. Can be speficied more than once")
 argparser.add_argument("--wifi-blacklist", action="append", default=[],
                        help="Skip the backup if the computer is connected to a network matching one of the provided regexes. Can be specified more than once")
-argparser.add_argument("--skip-on-battery", action="store_true",
+argparser.add_argument("--skip-on-battery", action="store_true", dest="skip_on_battery",
+                       help="Skip the backup if the computer is battery powered")
+argparser.add_argument("--no-skip-on-battery", action="store_false", dest="skip_on_battery",
                        help="Skip the backup if the computer is battery powered")
 argparser.add_argument("--monitor-url", action="append", default=[],
                        help="Perform an HTTP POST request to this URL to report events. Can be specified more than once")
@@ -116,8 +119,8 @@ def run_backup(args, unparsed_args):
                     f"Finished filesystem scan in {duration}s, found {data_size} bytes to backup in {total_files} files")
                 data_left_amount = max(data_size - latest_snapshot_size, 0)
                 if args.added_size_limit and data_left_amount > args.added_size_limit:
-                    message = f"Attempting to backup {utils.to_si_units(data_left_amount)}, " \
-                              f"the limit is {utils.to_si_units(args.added_size_limit)}, aborting!"
+                    message = f"Attempting to backup {human_numbers.to_si(data_left_amount)}, " \
+                              f"the limit is {human_numbers.to_si(args.added_size_limit)}, aborting!"
                     logger.critical(message)
                     process.send_signal(signal.SIGINT)
                     process.wait(timeout=10)
@@ -156,8 +159,8 @@ def run_backup(args, unparsed_args):
                     logger.debug(f"Currently backing up: {', '.join(current_files)}")
 
                 if args.desktop_notifications and utils.logging.ratelimit(topic="progress-notification", threshold=0.1):
-                    bytes_done_readable = utils.to_si_units(bytes_done)
-                    total_bytes_readable = utils.to_si_units(total_bytes)
+                    bytes_done_readable = human_numbers.to_si(bytes_done)
+                    total_bytes_readable = human_numbers.to_si(total_bytes)
                     utils.show_notification(f"Backup in progress... ({status})",
                                             message=f"{files_done}/{total_files} files\n"
                                                     f"{bytes_done_readable}/{total_bytes_readable}",
@@ -186,7 +189,7 @@ def run_backup(args, unparsed_args):
 
                 summary = "Backup succeeded"
                 message = f"{log_message}\n"
-                message += f"Added {utils.to_si_units(data_added)}"
+                message += f"Added {human_numbers.to_si(data_added)}"
                 urgency = utils.notifications.URGENCY_NORMAL
                 utils.show_notification(summary, message=message, urgency=urgency)
 
