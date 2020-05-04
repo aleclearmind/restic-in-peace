@@ -30,6 +30,8 @@ chmod +x install.sh
 ### restic
 
 It's packaged for most distros, just install it from there.
+This tool has been tested with restic 0.9.6, it should work with anything more recent and also with older versions,
+as the features used by restic-in-peace have been implemented for a while.
 
 ## Configuration file
 
