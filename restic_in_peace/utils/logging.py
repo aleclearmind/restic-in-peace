@@ -114,7 +114,10 @@ def ratelimit(topic="", threshold=1, update=True):
 
 def send_log_to_file(file, filter=None, level=0, format="{message}", truncate=True):
     if truncate and os.path.exists(file):
-        os.truncate(file, 0)
+        try:
+            os.truncate(file, 0)
+        except:
+            pass
     logger.add(file, level=level, filter=filter, format=format)
 
 
