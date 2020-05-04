@@ -1,4 +1,5 @@
 import re
+import os
 
 from .command import run_command
 from .logging import logger
@@ -29,18 +30,18 @@ def get_active_network_interface(for_ip="1.1.1.1"):
 
 
 def get_wifi_network():
-    essid_regex = re.compile('ESSID:"(?P<essid>[^"]*)"')
     interface = get_active_network_interface()
     if interface is None:
         logger.error("Could not determine default network interface")
         return
 
-    wifi_interfaces_regex = re.compile(r"wlp\d+s\d+|wlan\d+|wifi\d+")
-    if wifi_interfaces_regex.match(interface) is None:
-        logger.info(f"Default interface {interface} was not determined to be wifi")
-        return
+    with open(os.path.join("/sys/class/net/", interface, "uevent")) as f:
+        if "DEVTYPE=wlan" not in f.read():
+            logger.info(f"Default interface {interface} was not determined to be wifi")
+            return
 
     process = run_command(f"iwconfig {interface}", shell=True)
+    essid_regex = re.compile('ESSID:"(?P<essid>[^"]*)"')
     match = essid_regex.search(process.stdout)
     if match is None:
         logger.error(f"Could not determine network for interface {interface}")
