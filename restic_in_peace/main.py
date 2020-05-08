@@ -5,6 +5,7 @@ import json
 import signal
 import subprocess
 import sys
+from _curses import meta
 
 from . import description
 from . import utils
@@ -33,22 +34,23 @@ argparser.add_argument("--wifi-blacklist", action="append", default=[],
 argparser.add_argument("--skip-on-battery", action="store_true", dest="skip_on_battery",
                        help="Skip the backup if the computer is battery powered")
 argparser.add_argument("--no-skip-on-battery", action="store_false", dest="skip_on_battery",
-                       help="Skip the backup if the computer is battery powered")
+                       help="Force the backup even if the computer is battery powered")
 argparser.add_argument("--monitor-url", action="append", default=[],
                        help="Perform an HTTP POST request to this URL to report events. Can be specified more than once")
 argparser.add_argument("--desktop-notifications", action="store_true",
                        help="Send desktop notification to any org.freedesktop.Notification compliant DBUS daemon")
-argparser.add_argument("--tee-restic-logs",
+argparser.add_argument("--tee-restic-logs", metavar="FILE",
                        help="Write restic output to this file. @CMD is substituted with the command, @FD with stdout or stderr")
 argparser.add_argument("--loglevel", default="INFO", help="Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
 # Restic options which we need to parse to invoke commands other than the original one
 argparser.add_argument("--tag", action="append",
                        help="Only the latest snapshot having this tag will be considered as baseline. Supplying this option is highly recommended")
-argparser.add_argument("--repo", "-r", help="Restic repository")
-argparser.add_argument("--password-file", "-p", help="Password file")
+argparser.add_argument("-r", "--repo", help="Restic repository")
+argparser.add_argument("-p", "--password-file", help="Password file")
 argparser.add_argument("--password-command", help="Password command")
-argparser.add_argument("--verbose", "-v", nargs="?", help="Verbose output (passed to restic, for this wrapper use --loglevel)")
+argparser.add_argument("-v", "--verbose", nargs="?", metavar="LEVEL",
+                       help="Verbose output (passed to restic, for this wrapper use --loglevel)")
 
 
 def get_latest_snapshot_stats(args):
