@@ -5,7 +5,6 @@ import json
 import signal
 import subprocess
 import sys
-from _curses import meta
 
 from . import description
 from . import utils
@@ -21,34 +20,44 @@ return_codes = {
 
 # WARN: boolean arguments must have action store_true, otherwise build_restic_command result will be incorrect
 argparser = argparse.ArgumentParser(description=description,
-                                    epilog="Any other argument will get passed to restic as-is")
+                                    epilog="Other arguments will get passed to restic as-is, refer to the manual")
 argparser.add_argument("command", help="Restic command")
 
 # These options are specific of this tool and must not be passed to restic
 argparser.add_argument("--added-size-limit", type=human_numbers.parse,
-                       help="Maximim number of new bytes to backup. If restic counts more than this, the backup is aborted")
+                       help="Maximim number of new bytes to backup. "
+                            "If restic counts more than this, the backup is aborted")
 argparser.add_argument("--wifi-whitelist", action="append", default=[],
-                       help="Skip the backup if this parameter is provided and the computer is not connected to a network matching one of the provided regexes. Can be speficied more than once")
+                       help="Skip the backup if this parameter is provided and the computer is not "
+                            "connected to a network matching one of the provided regexes. "
+                            "Can be speficied more than once")
 argparser.add_argument("--wifi-blacklist", action="append", default=[],
-                       help="Skip the backup if the computer is connected to a network matching one of the provided regexes. Can be specified more than once")
+                       help="Skip the backup if the computer is connected to a network "
+                            "matching one of the provided regexes. "
+                            "Can be specified more than once")
 argparser.add_argument("--skip-on-battery", action="store_true", dest="skip_on_battery",
                        help="Skip the backup if the computer is battery powered")
 argparser.add_argument("--no-skip-on-battery", action="store_false", dest="skip_on_battery",
                        help="Force the backup even if the computer is battery powered")
 argparser.add_argument("--monitor-url", action="append", default=[],
-                       help="Perform an HTTP POST request to this URL to report events. Can be specified more than once")
+                       help="Perform an HTTP POST request to this URL to report events. "
+                            "Can be specified more than once")
 argparser.add_argument("--desktop-notifications", action="store_true",
                        help="Send desktop notification to any org.freedesktop.Notification compliant DBUS daemon")
 argparser.add_argument("--tee-restic-logs", metavar="FILE",
-                       help="Write restic output to this file. @CMD is substituted with the command, @FD with stdout or stderr")
+                       help="Write restic output to this file. "
+                            "@CMD is substituted with the command, @FD with stdout or stderr")
 argparser.add_argument("--loglevel", default="INFO", help="Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
 # Restic options which we need to parse to invoke commands other than the original one
 argparser.add_argument("--tag", action="append",
-                       help="Only the latest snapshot having this tag will be considered as baseline. Supplying this option is highly recommended")
+                       help="Only the latest snapshot having this tag will be considered "
+                            "as baseline for previous backup size calculation. "
+                            "The option will also be passed to restic."
+                            "Supplying this option is highly recommended")
 argparser.add_argument("-r", "--repo", help="Restic repository")
-argparser.add_argument("-p", "--password-file", help="Password file")
-argparser.add_argument("--password-command", help="Password command")
+argparser.add_argument("-p", "--password-file", help=argparse.SUPPRESS)
+argparser.add_argument("--password-command", help=argparse.SUPPRESS)
 argparser.add_argument("-v", "--verbose", nargs="?", metavar="LEVEL",
                        help="Verbose output (passed to restic, for this wrapper use --loglevel)")
 
