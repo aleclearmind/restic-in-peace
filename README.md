@@ -1,4 +1,4 @@
-# Restic-in-peace
+# restic-in-peace
 
 rev.ng tool of choice for backup is [restic](https://restic.net/).
 We use [resticprofile](https://github.com/creativeprojects/resticprofile/) to manage multiple backup profiles
