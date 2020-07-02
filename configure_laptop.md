@@ -103,8 +103,8 @@ If you configured a sensible size limit in your configuration the first backup w
 resticprofile \
     -c .config/restic-in-peace/resticprofile.json \
      --name <profile> \
-     --added-size-limit 0 \
-     backup
+     backup \
+     --added-size-limit 0
 ```
 
 Re-run the backup. This should take much less time
