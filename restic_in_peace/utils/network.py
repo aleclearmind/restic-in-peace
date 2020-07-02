@@ -40,8 +40,8 @@ def get_wifi_network():
             logger.info(f"Default interface {interface} was not determined to be wifi")
             return
 
-    process = run_command(f"iwconfig {interface}", shell=True)
-    essid_regex = re.compile('ESSID:"(?P<essid>[^"]*)"')
+    process = run_command(f"iw dev {interface} link", shell=True)
+    essid_regex = re.compile('SSID: (?P<essid>.*)')
     match = essid_regex.search(process.stdout)
     if match is None:
         logger.error(f"Could not determine network for interface {interface}")
