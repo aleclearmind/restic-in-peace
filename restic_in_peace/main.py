@@ -202,7 +202,8 @@ def run_backup(args, unparsed_args):
                 message = f"{log_message}\n"
                 message += f"Added {human_numbers.to_si(data_added)}"
                 urgency = utils.notifications.URGENCY_NORMAL
-                utils.show_notification(summary, message=message, urgency=urgency)
+                if args.desktop_notifications:
+                    utils.show_notification(summary, message=message, urgency=urgency)
 
         retcode = process.poll()
         if retcode != 0:
@@ -242,7 +243,8 @@ def main(args, unparsed_args):
                 summary = "Backup failed"
                 message = f"Backup with tag {', '.join(args.tag)} failed with code {restic_returncode}"
                 urgency = utils.notifications.URGENCY_CRITICAL
-                utils.show_notification(summary, message=message, urgency=urgency)
+                if args.desktop_notifications:
+                    utils.show_notification(summary, message=message, urgency=urgency)
 
         except TooMuchDataException as e:
             summary = "Backup aborted"
