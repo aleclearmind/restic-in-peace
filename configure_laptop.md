@@ -118,8 +118,8 @@ resticprofile -c resticprofile.json --name <profile> backup
 The timer included in the repo starts every day systemd-timer:
 
 ```
-cp systemd/resticprofile@.service ~/.config/systemd/user/
-cp systemd/resticprofile-daily@.timer ~/.config/systemd/user/
+ln -s $PWD/systemd/resticprofile@.service ~/.config/systemd/user/
+ln -s $PWD/systemd/resticprofile-daily@.timer ~/.config/systemd/user/
 systemctl --user enable resticprofile-daily@<profile>.timer
 ```
 
