@@ -32,7 +32,7 @@
         "inherit": "common",
         "backup": {
             "source": ["/home/<user>"],
-            "tag": "profile_1_tag"
+            "tag": "profile_1"
         }
     }
 }
