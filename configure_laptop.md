@@ -127,7 +127,7 @@ Check that the unit runs correctly:
 
 ```
 systemctl --user start resticprofile-daily@<profile>.timer
-journalctl --follow --unit resticprofile@<profile>.service
+journalctl --user --follow --unit resticprofile@<profile>.service
 ```
 
 In case of failure, the backup will be automatically retried in 30 minutes.
