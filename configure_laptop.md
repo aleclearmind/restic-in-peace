@@ -131,6 +131,11 @@ journalctl --user --follow --unit resticprofile@<profile>.service
 ```
 
 In case of failure, the backup will be automatically retried in 30 minutes.
+You can also check the history of backup success/failures as follows:
+
+```
+journalctl --user -u resticprofile@<profile>.service
+```
 
 # Verify the backup
 
