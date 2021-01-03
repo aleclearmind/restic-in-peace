@@ -130,6 +130,8 @@ systemctl --user start resticprofile-daily@<profile>.timer
 journalctl --follow --unit resticprofile@<profile>.service
 ```
 
+In case of failure, the backup will be automatically retried in 30 minutes.
+
 # Verify the backup
 
 First check the backup consistency. This does not read data, unless the `--read-data` flag is supplied.

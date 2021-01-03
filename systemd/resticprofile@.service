@@ -6,3 +6,5 @@ After=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/resticprofile -c .config/restic-in-peace/resticprofile.json --name %i backup
+Restart=on-failure
+RestartSec=30m
