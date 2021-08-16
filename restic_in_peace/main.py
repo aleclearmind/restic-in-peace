@@ -246,7 +246,7 @@ def run_backup(args, unparsed_args):
                 logger.info(f"{dirs_new}/{dirs_changed}/{dirs_unmodified} new/changed/unmodified directories")
                 logger.info(f"{data_added} bytes added to the backup")
 
-                summary = "Backup succeeded"
+                summary = "Backup finished"
                 message = f"{log_message}\n"
                 message += f"Added {human_numbers.to_si(data_added)}"
                 urgency = utils.notifications.URGENCY_NORMAL
@@ -289,11 +289,14 @@ def main(args, unparsed_args):
             restic_returncode = run_backup(args, unparsed_args)
 
             if restic_returncode:
-                summary = "Backup failed"
-                message = f"Backup with tag {', '.join(args.tag)} failed with code {restic_returncode}"
-                urgency = utils.notifications.URGENCY_CRITICAL
-                if args.desktop_notifications:
-                    utils.show_notification(summary, message=message, urgency=urgency)
+                if restic_returncode == 3:
+                    summary = "Backup succeeded with errors"
+                    message = f"Backup with tag {', '.join(args.tag)} finished but some files could not be read"
+                    urgency = utils.notifications.URGENCY_NORMAL
+                else:
+                    summary = "Backup failed"
+                    message = f"Backup with tag {', '.join(args.tag)} failed with code {restic_returncode}"
+                    urgency = utils.notifications.URGENCY_CRITICAL
 
         except TooMuchDataException as e:
             summary = "Backup aborted"
