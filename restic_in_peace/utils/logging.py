@@ -137,10 +137,13 @@ restic_err_only_filter = ExactLevelFilter("RESTIC_ERR")
 logger.level("RESTIC_OUT", no=logger.level("TRACE").no, color=logger.level("TRACE").color)
 logger.level("RESTIC_ERR", no=logger.level("TRACE").no, color=logger.level("TRACE").color)
 
-logger.configure(handlers=[
-    {
-        "sink": sys.stdout, "level": 0,
-        "format": "<level>{time}|{level}|{module}|{message}</level>",
-        "filter": global_filter
-    }
-])
+logger.configure(
+    handlers=[
+        {
+            "sink": sys.stdout,
+            "level": 0,
+            "format": "<level>{time}|{level}|{module}|{message}</level>",
+            "filter": global_filter,
+        }
+    ]
+)

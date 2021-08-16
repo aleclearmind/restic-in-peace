@@ -19,52 +19,88 @@ return_codes = {
 }
 
 # WARN: boolean arguments must have action store_true, otherwise build_restic_command result will be incorrect
-argparser = argparse.ArgumentParser(description=description,
-                                    epilog="Other arguments will get passed to restic as-is, refer to the manual")
+argparser = argparse.ArgumentParser(
+    description=description, epilog="Other arguments will get passed to restic as-is, refer to the manual"
+)
 argparser.add_argument("command", help="Restic command")
 
 # These options are specific of this tool and must not be passed to restic
-argparser.add_argument("--added-size-limit", type=human_numbers.parse,
-                       help="Maximim number of new bytes to backup. "
-                            "If restic counts more than this, the backup is aborted")
-argparser.add_argument("--wifi-whitelist", action="append", default=[],
-                       help="Skip the backup if this parameter is provided and the computer is not "
-                            "connected to a network matching one of the provided regexes. "
-                            "Can be speficied more than once")
-argparser.add_argument("--wifi-blacklist", action="append", default=[],
-                       help="Skip the backup if the computer is connected to a network "
-                            "matching one of the provided regexes. "
-                            "Can be specified more than once")
-argparser.add_argument("--skip-on-battery", action="store_true", dest="skip_on_battery",
-                       help="Skip the backup if the computer is battery powered")
-argparser.add_argument("--no-skip-on-battery", action="store_false", dest="skip_on_battery",
-                       help="Force the backup even if the computer is battery powered")
-argparser.add_argument("--monitor-url", action="append", default=[],
-                       help="Perform an HTTP POST request to this URL to report events. "
-                            "Can be specified more than once")
-argparser.add_argument("--desktop-notifications", action="store_true",
-                       help="Send desktop notification to any org.freedesktop.Notification compliant DBUS daemon")
-argparser.add_argument("--tee-restic-logs", metavar="FILE",
-                       help="Write restic output to this file. "
-                            "@CMD is substituted with the command, @FD with stdout or stderr")
+argparser.add_argument(
+    "--added-size-limit",
+    type=human_numbers.parse,
+    help="Maximim number of new bytes to backup. " "If restic counts more than this, the backup is aborted",
+)
+argparser.add_argument(
+    "--wifi-whitelist",
+    action="append",
+    default=[],
+    help="Skip the backup if this parameter is provided and the computer is not "
+    "connected to a network matching one of the provided regexes. "
+    "Can be speficied more than once",
+)
+argparser.add_argument(
+    "--wifi-blacklist",
+    action="append",
+    default=[],
+    help="Skip the backup if the computer is connected to a network "
+    "matching one of the provided regexes. "
+    "Can be specified more than once",
+)
+argparser.add_argument(
+    "--skip-on-battery",
+    action="store_true",
+    dest="skip_on_battery",
+    help="Skip the backup if the computer is battery powered",
+)
+argparser.add_argument(
+    "--no-skip-on-battery",
+    action="store_false",
+    dest="skip_on_battery",
+    help="Force the backup even if the computer is battery powered",
+)
+argparser.add_argument(
+    "--monitor-url",
+    action="append",
+    default=[],
+    help="Perform an HTTP POST request to this URL to report events. " "Can be specified more than once",
+)
+argparser.add_argument(
+    "--desktop-notifications",
+    action="store_true",
+    help="Send desktop notification to any org.freedesktop.Notification compliant DBUS daemon",
+)
+argparser.add_argument(
+    "--tee-restic-logs",
+    metavar="FILE",
+    help="Write restic output to this file. " "@CMD is substituted with the command, @FD with stdout or stderr",
+)
 argparser.add_argument("--loglevel", default="INFO", help="Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
 # Restic options which we need to parse to invoke commands other than the original one
-argparser.add_argument("--tag", action="append",
-                       help="Only the latest snapshot having this tag will be considered "
-                            "as baseline for previous backup size calculation. "
-                            "The option will also be passed to restic."
-                            "Supplying this option is highly recommended")
+argparser.add_argument(
+    "--tag",
+    action="append",
+    help="Only the latest snapshot having this tag will be considered "
+    "as baseline for previous backup size calculation. "
+    "The option will also be passed to restic."
+    "Supplying this option is highly recommended",
+)
 argparser.add_argument("-r", "--repo", help="Restic repository")
 argparser.add_argument("-p", "--password-file", help=argparse.SUPPRESS)
 argparser.add_argument("--password-command", help=argparse.SUPPRESS)
-argparser.add_argument("-v", "--verbose", nargs="?", metavar="LEVEL",
-                       help="Verbose output (passed to restic, for this wrapper use --loglevel)")
+argparser.add_argument(
+    "-v",
+    "--verbose",
+    nargs="?",
+    metavar="LEVEL",
+    help="Verbose output (passed to restic, for this wrapper use --loglevel)",
+)
 
 
 def get_latest_snapshot_stats(args):
-    get_latest_snapshot_command = utils.build_restic_command("snapshots", args, additional_argparse_arguments=["tag"],
-                                                             force_json=True)
+    get_latest_snapshot_command = utils.build_restic_command(
+        "snapshots", args, additional_argparse_arguments=["tag"], force_json=True
+    )
     process = utils.run_command(get_latest_snapshot_command)
     try:
         snapshots = json.loads(process.stdout)
@@ -77,8 +113,9 @@ def get_latest_snapshot_stats(args):
     snapshots.sort(key=lambda s: s["time"], reverse=True)
     latest_snapshot = snapshots[0]
 
-    stats_command = utils.build_restic_command("stats", args, additional_unparsed_arguments=[latest_snapshot["id"]],
-                                               force_json=True)
+    stats_command = utils.build_restic_command(
+        "stats", args, additional_unparsed_arguments=[latest_snapshot["id"]], force_json=True
+    )
     process = utils.run_command(stats_command)
     try:
         snapshot_stats = json.loads(process.stdout)
@@ -94,18 +131,23 @@ def run_backup(args, unparsed_args):
         latest_snapshot_size = 0
         latest_snapshot_id = "<NONE>"
         logger.warning(
-            f"Latest snapshot stats not found. It is normal if this is your first backup. Is the tag correct?")
+            f"Latest snapshot stats not found. It is normal if this is your first backup. Is the tag correct?"
+        )
     else:
         latest_snapshot_size = latest_snapshot_stats["total_size"]
         latest_snapshot_id = latest_snapshot["short_id"]
         logger.info(f"Latest snapshot {latest_snapshot_id} has size {latest_snapshot_size}")
 
-    backup_command = utils.build_restic_command("backup", args, additional_argparse_arguments=["tag"],
-                                                additional_unparsed_arguments=unparsed_args, force_json=True,
-                                                force_verbose=True)
+    backup_command = utils.build_restic_command(
+        "backup",
+        args,
+        additional_argparse_arguments=["tag"],
+        additional_unparsed_arguments=unparsed_args,
+        force_json=True,
+        force_verbose=True,
+    )
 
-    process = subprocess.Popen(backup_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               universal_newlines=True)
+    process = subprocess.Popen(backup_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
     with utils.command.EnsureGracefulExit(process):
         scan_finished = False
@@ -127,11 +169,14 @@ def run_backup(args, unparsed_args):
                 data_size = parsed["data_size"]
                 duration = int(parsed["duration"])
                 logger.info(
-                    f"Finished filesystem scan in {duration}s, found {data_size} bytes to backup in {total_files} files")
+                    f"Finished filesystem scan in {duration}s, found {data_size} bytes to backup in {total_files} files"
+                )
                 data_left_amount = max(data_size - latest_snapshot_size, 0)
                 if args.added_size_limit and data_left_amount > args.added_size_limit:
-                    message = f"Attempting to backup {human_numbers.to_si(data_left_amount)}, " \
-                              f"the limit is {human_numbers.to_si(args.added_size_limit)}, aborting!"
+                    message = (
+                        f"Attempting to backup {human_numbers.to_si(data_left_amount)}, "
+                        f"the limit is {human_numbers.to_si(args.added_size_limit)}, aborting!"
+                    )
                     logger.critical(message)
                     process.send_signal(signal.SIGINT)
                     process.wait(timeout=10)
@@ -161,9 +206,11 @@ def run_backup(args, unparsed_args):
                         percent_done = 0
                     status = f"{percent_done}%, scanning"
 
-                message = f"Progress: {status} ({bytes_done}/{total_bytes} bytes, " \
-                          f"{files_done}/{total_files} files, " \
-                          f"{error_count} errors)"
+                message = (
+                    f"Progress: {status} ({bytes_done}/{total_bytes} bytes, "
+                    f"{files_done}/{total_files} files, "
+                    f"{error_count} errors)"
+                )
                 if utils.logging.ratelimit(topic="progress"):
                     logger.info(message)
                 if current_files:
@@ -172,10 +219,11 @@ def run_backup(args, unparsed_args):
                 if args.desktop_notifications and utils.logging.ratelimit(topic="progress-notification", threshold=0.1):
                     bytes_done_readable = human_numbers.to_si(bytes_done)
                     total_bytes_readable = human_numbers.to_si(total_bytes)
-                    utils.show_notification(f"Backup in progress... ({status})",
-                                            message=f"{files_done}/{total_files} files\n"
-                                                    f"{bytes_done_readable}/{total_bytes_readable}",
-                                            progress=percent_done)
+                    utils.show_notification(
+                        f"Backup in progress... ({status})",
+                        message=f"{files_done}/{total_files} files\n" f"{bytes_done_readable}/{total_bytes_readable}",
+                        progress=percent_done,
+                    )
 
             elif parsed["message_type"] == "summary":
                 files_new = parsed.get("files_new", 0)
@@ -230,8 +278,9 @@ def main(args, unparsed_args):
             logger.error("Skipping backup because of network conditions")
             exit(return_codes["SKIP_CAUSE_NETWORK"])
 
-        utils.log_event_to_monitors("command_started", args.monitor_url,
-                                    additional_data={"command": args.command, "tag": args.tag})
+        utils.log_event_to_monitors(
+            "command_started", args.monitor_url, additional_data={"command": args.command, "tag": args.tag}
+        )
         if args.desktop_notifications:
             utils.show_notification("Backup started", message=f"Backup with tag {', '.join(args.tag)}")
 
@@ -268,13 +317,17 @@ def main(args, unparsed_args):
             utils.show_notification(summary, message=message, urgency=urgency)
 
     else:
-        restic_command = utils.build_restic_command(args.command, args, additional_argparse_arguments=["tag"],
-                                                    additional_unparsed_arguments=unparsed_args)
+        restic_command = utils.build_restic_command(
+            args.command, args, additional_argparse_arguments=["tag"], additional_unparsed_arguments=unparsed_args
+        )
 
         logger.debug(f"About to execute {restic_command}")
 
-        utils.log_event_to_monitors("command_started", args.monitor_url,
-                                    additional_data={"command": args.command, "tag": args.tag, "repo": args.repo})
+        utils.log_event_to_monitors(
+            "command_started",
+            args.monitor_url,
+            additional_data={"command": args.command, "tag": args.tag, "repo": args.repo},
+        )
         if args.desktop_notifications:
             summary = f"Restic {args.command} started"
             message = f"Restic {args.command} started on repo {args.repo}"
@@ -286,8 +339,9 @@ def main(args, unparsed_args):
         # so it can also be redirected to a file with the --tee-restic-logs option
         stdout_wrapper = utils.logging.LoggingTextIOWrapper(sys.stdout, "RESTIC_OUT")
         stderr_wrapper = utils.logging.LoggingTextIOWrapper(sys.stderr, "RESTIC_ERR")
-        process = subprocess.Popen(restic_command, stdout=stdout_wrapper, stderr=stderr_wrapper,
-                                   universal_newlines=True)
+        process = subprocess.Popen(
+            restic_command, stdout=stdout_wrapper, stderr=stderr_wrapper, universal_newlines=True
+        )
         with utils.command.EnsureGracefulExit(process):
             process.wait()
         stdout_wrapper.close()

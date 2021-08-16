@@ -10,10 +10,14 @@ def run_command(args, shell=False):
     return process
 
 
-def build_restic_command(command, args_from_argparse,
-                         additional_argparse_arguments=None,
-                         additional_unparsed_arguments=None,
-                         force_json=False, force_verbose=False):
+def build_restic_command(
+    command,
+    args_from_argparse,
+    additional_argparse_arguments=None,
+    additional_unparsed_arguments=None,
+    force_json=False,
+    force_verbose=False,
+):
     additional_unparsed_arguments = additional_unparsed_arguments or []
     additional_argparse_arguments = additional_argparse_arguments or []
 

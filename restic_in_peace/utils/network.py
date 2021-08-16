@@ -12,14 +12,16 @@ def get_active_network_interface(for_ip="1.1.1.1"):
     # TODO: the resolution should be somehow recursive, to handle VPNs or complex routing
 
     # First format: 1.1.1.1 via 192.168.1.254 dev wlp3s0 src 192.168.1.151 uid 1000
-    routed_ip_regex = re.compile(r"^(?P<dst>\d+\.\d+\.\d+\.\d+) "
-                                 r"via (?P<gateway>\d+\.\d+\.\d+\.\d+) "
-                                 r"dev (?P<nic>([^ ])*) "
-                                 r"src (?P<src>\d+\.\d+\.\d+\.\d+)")
+    routed_ip_regex = re.compile(
+        r"^(?P<dst>\d+\.\d+\.\d+\.\d+) "
+        r"via (?P<gateway>\d+\.\d+\.\d+\.\d+) "
+        r"dev (?P<nic>([^ ])*) "
+        r"src (?P<src>\d+\.\d+\.\d+\.\d+)"
+    )
     # Second format: 192.168.1.254 dev wlp3s0 src 192.168.1.151 uid 1000
-    local_ip_regex = re.compile(r"^(?P<dst>\d+\.\d+\.\d+\.\d+) "
-                                r"dev (?P<nic>[^ ]*)"
-                                r"src (?P<src>\d+\.\d+\.\d+\.\d+)")
+    local_ip_regex = re.compile(
+        r"^(?P<dst>\d+\.\d+\.\d+\.\d+) " r"dev (?P<nic>[^ ]*)" r"src (?P<src>\d+\.\d+\.\d+\.\d+)"
+    )
 
     process = run_command(f"env ip route get {for_ip}", shell=True)
     route = routed_ip_regex.match(process.stdout)
@@ -41,7 +43,7 @@ def get_wifi_network():
             return
 
     process = run_command(f"iw dev {interface} link", shell=True)
-    essid_regex = re.compile('SSID: (?P<essid>.*)')
+    essid_regex = re.compile("SSID: (?P<essid>.*)")
     match = essid_regex.search(process.stdout)
     if match is None:
         logger.error(f"Could not determine network for interface {interface}")

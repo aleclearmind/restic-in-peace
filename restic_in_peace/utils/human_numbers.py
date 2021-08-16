@@ -15,21 +15,21 @@ simple_number_regex = re.compile(number_capture_group)
 
 
 si_magnitudes_short = {
-    "":     0,
-    "k":    3,
-    "m":    6,
-    "g":    9,
-    "t":    12,
-    "p":    15,
+    "": 0,
+    "k": 3,
+    "m": 6,
+    "g": 9,
+    "t": 12,
+    "p": 15,
 }
 si_prefixes_short = {v: k for k, v in si_magnitudes_short.items()}
 si_regex_short = re.compile(
-    number_capture_group + r"( )*" +
-    capture_group([k for k in si_magnitudes_short.keys() if k], group_name="prefix"), re.IGNORECASE
+    number_capture_group + r"( )*" + capture_group([k for k in si_magnitudes_short.keys() if k], group_name="prefix"),
+    re.IGNORECASE,
 )
 
 si_magnitudes = {
-    "":     0,
+    "": 0,
     "kilo": 3,
     "mega": 6,
     "giga": 9,
@@ -38,12 +38,12 @@ si_magnitudes = {
 }
 si_prefixes = {v: k for k, v in si_magnitudes.items()}
 si_regex = re.compile(
-    number_capture_group + r"( )*" +
-    capture_group([k for k in si_magnitudes.keys() if k], group_name="prefix"), re.IGNORECASE
+    number_capture_group + r"( )*" + capture_group([k for k in si_magnitudes.keys() if k], group_name="prefix"),
+    re.IGNORECASE,
 )
 
 bin_magnitudes = {
-    "":     0,
+    "": 0,
     "kibi": 10,
     "mebi": 20,
     "gibi": 30,
@@ -52,12 +52,12 @@ bin_magnitudes = {
 }
 bin_prefixes = {v: k for k, v in bin_magnitudes.items()}
 bin_regex = re.compile(
-    number_capture_group + r"( )*" +
-    capture_group([k for k in bin_magnitudes.keys() if k], group_name="prefix"), re.IGNORECASE
+    number_capture_group + r"( )*" + capture_group([k for k in bin_magnitudes.keys() if k], group_name="prefix"),
+    re.IGNORECASE,
 )
 
 bin_magnitudes_short = {
-    "":   0,
+    "": 0,
     "ki": 10,
     "mi": 20,
     "gi": 30,
@@ -66,8 +66,8 @@ bin_magnitudes_short = {
 }
 bin_prefixes_short = {v: k for k, v in bin_magnitudes_short.items()}
 bin_regex_short = re.compile(
-    number_capture_group + r"( )*" +
-    capture_group([k for k in bin_magnitudes_short.keys() if k], group_name="prefix"), re.IGNORECASE
+    number_capture_group + r"( )*" + capture_group([k for k in bin_magnitudes_short.keys() if k], group_name="prefix"),
+    re.IGNORECASE,
 )
 
 
@@ -132,33 +132,29 @@ def parse(s):
 
 if __name__ == "__main__":
     parse_testcases = [
-        ("1B",  1),
-        ("1000B",  1000),
-
+        ("1B", 1),
+        ("1000B", 1000),
         ("1KB", 10 ** 3),
         ("1MB", 10 ** 6),
         ("1GB", 10 ** 9),
         ("1TB", 10 ** 12),
         ("1PB", 10 ** 15),
-
         ("1kilo", 10 ** 3),
         ("1mega", 10 ** 6),
         ("1giga", 10 ** 9),
         ("1tera", 10 ** 12),
         ("1peta", 10 ** 15),
-
-        ("1kibi",  2 ** 10),
-        ("1mebi",  2 ** 20),
-        ("1gibi",  2 ** 30),
-        ("1tebi",  2 ** 40),
-        ("1pebi",  2 ** 50),
-
-        ("1ki",  2 ** 10),
-        ("1mi",  2 ** 20),
-        ("1gi",  2 ** 30),
-        ("1ti",  2 ** 40),
-        ("1pi",  2 ** 50),
+        ("1kibi", 2 ** 10),
+        ("1mebi", 2 ** 20),
+        ("1gibi", 2 ** 30),
+        ("1tebi", 2 ** 40),
+        ("1pebi", 2 ** 50),
+        ("1ki", 2 ** 10),
+        ("1mi", 2 ** 20),
+        ("1gi", 2 ** 30),
+        ("1ti", 2 ** 40),
+        ("1pi", 2 ** 50),
     ]
     for testcase, expected in parse_testcases:
-        assert(parse(testcase) == expected)
+        assert parse(testcase) == expected
     print("Tests ok")
