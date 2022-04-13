@@ -21,7 +21,7 @@ you can mount a read-only copy of the backup using FUSE. You will find all the s
 resticprofile -c resticprofile.json --name <profile> mount /mount/point
 ```
 
-Sometimes the virtual filesystem is not properly unmounted. Calling the `mount` command again will unmount it.
+Note: to unmount the backup you just have to terminate restic (CTRL+C). Before unmounting be sure to not be holding any open file descriptors, or restic will not be able to properly unmount and you'll end up with a stale FUSE mount. This is annoying, but it does *not* endanger the backed up data in any way. Closing all the opened files/directories (this includes shells opened in a mounted backup directory) will solve the problem.
 
 If you want to restore files directly, you first need to find the snapshot that contains them
 
@@ -53,11 +53,11 @@ The restic options must come after the command! Refer to `man restic` for all co
 
 ## Disaster recovery
 
-TODO: write this up when we've determined which offsite storag will be used
+TODO: write this up when we've determined which offsite storage will be used
 
 ## My backup is failing!
 
-This is probably due to a stale lock, for example due to connectivity loss. Ensure no restic process is running, then remove the lock using
+Your repo might have a stale lock. Ensure no restic process is running, then remove the lock using
 
 ```
 resticprofile -c resticprofile.json --name <profile> unlock
