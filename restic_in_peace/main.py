@@ -90,6 +90,8 @@ _run_backup.add_argument("--dry-run", action="store_true", dest="dry_run",
     help="skip unlock and check, pass --dry-run to backup and forget")
 _run_backup.add_argument("--log-path", dest="log_path", metavar="DIR",
     help="directory where the dated <run> subdir goes (overrides run-backup.log-path)")
+_run_backup.add_argument("--only", action="append", default=[], metavar="TAG",
+    help="only back up profiles whose backup.tag matches; can be repeated")
 _run_backup.add_argument("config", help="config file")
 
 # `collect-non-backuped-files`
@@ -274,7 +276,9 @@ def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
 
     if args.command == "run-backup":
         from .run_backup import run as run_backup_run
-        exit(run_backup_run(args.config, dry_run=args.dry_run, log_path=args.log_path))
+        exit(run_backup_run(
+            args.config, dry_run=args.dry_run, log_path=args.log_path, only=args.only,
+        ))
 
     if args.command == "collect-non-backuped-files":
         from .collect import run as collect_run

@@ -119,6 +119,50 @@ def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
 
 
+def test_only_filters_profiles_by_tag(
+    fake_home, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    # Two profiles with distinct tags, each pointing at its own repo. Only the
+    # one matching `--only` should be backed up.
+    import os as _os
+    repo_a = tmp_path / "repo-a"
+    repo_b = tmp_path / "repo-b"
+    for r in (repo_a, repo_b):
+        subprocess.run(
+            [restic_bin, "init", "--repo", str(r)],
+            env={**_os.environ, "RESTIC_PASSWORD": restic_password},
+            check=True, capture_output=True,
+        )
+    (fake_home / "doc.txt").write_text("hi\n")
+    log_dir = tmp_path / "logs"
+
+    config = write_config({
+        "run-backup": {"log-path": str(log_dir)},
+        "profiles": {
+            "common": {"env": {"RESTIC_PASSWORD": restic_password}},
+            "alpha": {
+                "inherit": "common",
+                "repository": str(repo_a),
+                "backup": {"source": [str(fake_home)], "tag": "alpha"},
+            },
+            "beta": {
+                "inherit": "common",
+                "repository": str(repo_b),
+                "backup": {"source": [str(fake_home)], "tag": "beta"},
+            },
+        },
+    })
+
+    result = subprocess.run(
+        [rip_bin, "run-backup", "--only", "alpha", str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    assert snapshot_count(restic_bin, repo_a, restic_password) == 1
+    assert snapshot_count(restic_bin, repo_b, restic_password) == 0
+
+
 def test_log_path_cli_overrides_config(
     fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):
