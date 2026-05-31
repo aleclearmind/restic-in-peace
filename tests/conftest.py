@@ -39,31 +39,42 @@ def fake_home(tmp_path):
 
 
 @pytest.fixture
-def restic_password(tmp_path):
-    pw = tmp_path / "password"
-    pw.write_text("test-password\n")
-    return pw
+def restic_password():
+    return "test-password"
 
 
 @pytest.fixture
 def restic_repo(tmp_path, restic_bin, restic_password):
     repo = tmp_path / "repo"
+    env = {**os.environ, "RESTIC_PASSWORD": restic_password}
     subprocess.run(
-        [restic_bin, "init", "--repo", str(repo), "--password-file", str(restic_password)],
+        [restic_bin, "init", "--repo", str(repo)],
         check=True,
         capture_output=True,
+        env=env,
     )
     return repo
 
 
 @pytest.fixture
 def test_env(rip_bin, fake_home, current_user):
-    """Subprocess env with HOME, USER, and PATH ready for invoking rip."""
+    """Subprocess env with HOME, USER, and PATH ready for invoking rip.
+
+    Intentionally does NOT set RESTIC_PASSWORD; profile-driven tests rely on
+    the profile's `env` block. Direct rip-backup tests should add it
+    explicitly via test_env_with_password.
+    """
     env = os.environ.copy()
+    env.pop("RESTIC_PASSWORD", None)
     env["HOME"] = str(fake_home)
     env["USER"] = current_user
     env["PATH"] = os.path.dirname(rip_bin) + ":" + env.get("PATH", "")
     return env
+
+
+@pytest.fixture
+def test_env_with_password(test_env, restic_password):
+    return {**test_env, "RESTIC_PASSWORD": restic_password}
 
 
 @pytest.fixture
@@ -76,11 +87,13 @@ def write_config(tmp_path):
     return _write
 
 
-def snapshot_count(restic_bin, repo, password_file):
+def snapshot_count(restic_bin, repo, password):
+    env = {**os.environ, "RESTIC_PASSWORD": password}
     result = subprocess.run(
-        [restic_bin, "snapshots", "-r", str(repo), "--password-file", str(password_file), "--json"],
+        [restic_bin, "snapshots", "-r", str(repo), "--json"],
         capture_output=True,
         text=True,
         check=True,
+        env=env,
     )
     return len(json.loads(result.stdout))

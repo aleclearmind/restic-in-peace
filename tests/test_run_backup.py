@@ -5,13 +5,13 @@ import yaml
 from .conftest import snapshot_count
 
 
-def _make_config(path, log_dir, repo, password_file, source, fix_homes=None):
+def _make_config(path, log_dir, repo, password, source, fix_homes=None):
     config = {
         "run-backup": {"log-path": str(log_dir)},
         "profiles": {
             "common": {
                 "repository": str(repo),
-                "password-file": str(password_file),
+                "env": {"RESTIC_PASSWORD": password},
             },
             "p1": {
                 "inherit": "common",
