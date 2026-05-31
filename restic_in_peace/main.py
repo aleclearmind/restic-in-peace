@@ -323,6 +323,9 @@ def main(args, unparsed_args):
             utils.show_notification(summary, message=message, urgency=urgency)
 
     else:
+        if args.command == "raw-backup":
+            args.command = "backup"
+
         restic_command = utils.build_restic_command(
             args.command, args, additional_argparse_arguments=["tag"], additional_unparsed_arguments=unparsed_args
         )
