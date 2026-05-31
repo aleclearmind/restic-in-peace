@@ -21,7 +21,8 @@ def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int]]:
     """
     settings, env = profile_mod.resolve(config, name, "backup")
     flags, positionals = profile_mod.to_argv(settings, "backup", drop_keys=profile_mod.RIP_ONLY)
-    cmd = ["restic", "backup", "--dry-run", "--verbose=2", "--json", *flags, *positionals]
+    # --no-lock so a stale lock from a previous run doesn't block the diagnostic.
+    cmd = ["restic", "backup", "--dry-run", "--verbose=2", "--json", "--no-lock", *flags, *positionals]
 
     proc_env = os.environ.copy()
     proc_env.update({k: str(v) for k, v in env.items()})

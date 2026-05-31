@@ -88,15 +88,16 @@ def run(config_path: str, dry_run: bool = False, log_path: str | None = None) ->
             _tee(f"Backing up profile {profile}\n", sinks)
 
             # Always write a per-profile ncdu diagnostic of what restic would
-            # add, before the real backup. Useful regardless of outcome: if
-            # the backup later aborts on size-limit, the file is already there.
-            if run_dir is not None and not dry_run:
+            # add, before the real backup. Useful regardless of outcome (real
+            # run or --dry-run, success or size-limit abort).
+            if run_dir is not None:
                 diag_path = run_dir / f"{profile}.ncdu.json"
                 _tee(f"Writing diagnostic to {diag_path}\n", sinks)
                 try:
                     diagnose.write_diagnostic(config, profile, diag_path)
                 except Exception as e:
                     _tee(f"diagnostic for {profile} failed: {e}\n", sinks)
+                    logger.error(f"diagnostic for {profile} failed: {e}")
 
             subcommands: list[str] = []
             if not dry_run:
