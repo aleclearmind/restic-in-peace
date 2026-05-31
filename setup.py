@@ -17,5 +17,6 @@ setup(
     packages=find_packages(),
     zip_safe=False,
     install_requires=requirements,
+    extras_require={"test": ["pytest"]},
     entry_points={"console_scripts": ["restic-in-peace=restic_in_peace.main:entrypoint"]},
 )

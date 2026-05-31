@@ -166,7 +166,7 @@ def run_backup(args, unparsed_args):
                 logger.debug("Could not parse line as JSON")
                 continue
 
-            if parsed["message_type"] == "status" and parsed.get("action", "") == "scan_finished":
+            if parsed["message_type"] in ("status", "verbose_status") and parsed.get("action", "") == "scan_finished":
                 scan_finished = True
                 total_files = parsed["total_files"]
                 data_size = parsed["data_size"]
@@ -264,6 +264,22 @@ def run_backup(args, unparsed_args):
 
 
 def main(args, unparsed_args):
+    if args.command == "fix-home":
+        from .fix_home import run as fix_home_run
+        fh_args = list(unparsed_args)
+        strict = "--strict" in fh_args
+        if strict:
+            fh_args.remove("--strict")
+        config_path = fh_args[0] if fh_args else "resticprofile.json"
+        exit(fix_home_run(config_path, strict=strict))
+
+    if args.command == "run-backup":
+        from .run_backup import run as run_backup_run
+        if not unparsed_args:
+            logger.error("run-backup requires a resticprofile config path argument")
+            exit(1)
+        exit(run_backup_run(unparsed_args[0]))
+
     if args.tee_restic_logs:
         destination = args.tee_restic_logs.replace("@CMD", args.command)
         stdout_destination = destination.replace("@FD", "stdout")
