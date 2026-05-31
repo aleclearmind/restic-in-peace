@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import IO
 
+from . import diagnose
 from . import profile as profile_mod
 from .utils import logger
 
@@ -53,13 +54,15 @@ def run(config_path: str, dry_run: bool = False) -> int:
     profiles = profile_mod.children_of(config, "common")
     current_user = os.environ.get("USER") or os.environ.get("LOGNAME")
 
+    run_dir: Path | None = None
+    if log_dir_str:
+        run_dir = Path(log_dir_str) / datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        run_dir.mkdir(parents=True, exist_ok=False)
+
     with ExitStack() as stack:
         sinks: list[IO[str]]
-        if log_dir_str:
-            log_dir = Path(log_dir_str)
-            log_dir.mkdir(parents=True, exist_ok=True)
-            log_path = log_dir / datetime.now().strftime("%Y-%m-%d")
-            log_file = stack.enter_context(log_path.open("a"))
+        if run_dir is not None:
+            log_file = stack.enter_context((run_dir / "backup.log").open("a"))
             sinks = [sys.stdout, log_file]
         else:
             sinks = [sys.stderr]
@@ -79,6 +82,18 @@ def run(config_path: str, dry_run: bool = False) -> int:
 
         for profile in profiles:
             _tee(f"Backing up profile {profile}\n", sinks)
+
+            # Always write a per-profile ncdu diagnostic of what restic would
+            # add, before the real backup. Useful regardless of outcome: if
+            # the backup later aborts on size-limit, the file is already there.
+            if run_dir is not None and not dry_run:
+                diag_path = run_dir / f"{profile}.ncdu.json"
+                _tee(f"Writing diagnostic to {diag_path}\n", sinks)
+                try:
+                    diagnose.write_diagnostic(config, profile, diag_path)
+                except Exception as e:
+                    _tee(f"diagnostic for {profile} failed: {e}\n", sinks)
+
             subcommands: list[str] = []
             if not dry_run:
                 subcommands.append("unlock")

@@ -43,6 +43,10 @@ rip-specific subcommands (anything else is passed to restic; refer to `man resti
       profile, and list files present on disk that none of the profiles
       would back up.
 
+run-backup automatically writes an ncdu v1.2 JSON of every file restic
+would add per profile next to its log file (one timestamped directory
+per run) when log-path is set. Open with `ncdu -f <path>`.
+
 profile-driven invocation:
   restic-in-peace --config <FILE> --name <PROFILE> <command> [args...]
   Loads <PROFILE> from <FILE>, translates settings to flags, then runs

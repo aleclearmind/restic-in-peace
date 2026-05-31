@@ -35,11 +35,24 @@ def test_orchestrates_backup(
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
 
-    log_files = list(log_dir.iterdir())
-    assert len(log_files) == 1
-    log_content = log_files[0].read_text()
+    # Exactly one dated sub-directory under log-path, holding the log and
+    # a per-profile ncdu diagnostic.
+    runs = sorted(log_dir.iterdir())
+    assert len(runs) == 1
+    run_dir = runs[0]
+    assert run_dir.is_dir()
+    log_file = run_dir / "backup.log"
+    assert log_file.exists()
+    log_content = log_file.read_text()
     assert "Backing up profile p1" in log_content
     assert "no errors were found" in log_content or "check" in log_content
+
+    import json as _json
+    diag = run_dir / "p1.ncdu.json"
+    assert diag.exists()
+    doc = _json.loads(diag.read_text())
+    assert doc[0] == 1 and doc[1] == 2
+
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
 
 
@@ -95,7 +108,8 @@ def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
 
-    log_content = (next(iter(log_dir.iterdir()))).read_text()
+    run_dir = next(iter(log_dir.iterdir()))
+    log_content = (run_dir / "backup.log").read_text()
     # backup ran (with --dry-run), unlock and check skipped.
     assert "Backing up profile p1" in log_content
     assert "restic backup" in log_content and "--dry-run" in log_content
