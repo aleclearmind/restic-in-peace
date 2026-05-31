@@ -15,6 +15,8 @@ setup(
     author_email="filippocremonese@gmail.com",
     license="TODO",
     packages=find_packages(),
+    package_data={"restic_in_peace": ["restic_flags.json"]},
+    include_package_data=True,
     zip_safe=False,
     install_requires=requirements,
     extras_require={"test": ["pytest"]},

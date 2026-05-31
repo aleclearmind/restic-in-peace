@@ -1,0 +1,460 @@
+{
+  "flags": {
+    "add": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "allow-other": {
+      "type": "boolean"
+    },
+    "archive": {
+      "type": "boolean"
+    },
+    "blob": {
+      "type": "string"
+    },
+    "cacert": {
+      "type": "string"
+    },
+    "cache-dir": {
+      "type": "string"
+    },
+    "cleanup": {
+      "type": "boolean"
+    },
+    "cleanup-cache": {
+      "type": "boolean"
+    },
+    "compact": {
+      "type": "boolean"
+    },
+    "compression": {
+      "type": "string"
+    },
+    "copy-chunker-params": {
+      "type": "boolean"
+    },
+    "delete": {
+      "type": "boolean"
+    },
+    "dry-run": {
+      "type": "boolean"
+    },
+    "exclude": {
+      "type": "string"
+    },
+    "exclude-caches": {
+      "type": "boolean"
+    },
+    "exclude-file": {
+      "type": "string"
+    },
+    "exclude-if-present": {
+      "type": "boolean"
+    },
+    "exclude-larger-than": {
+      "type": "string"
+    },
+    "exclude-xattr": {
+      "type": "string"
+    },
+    "files-from": {
+      "type": "string"
+    },
+    "files-from-raw": {
+      "type": "string"
+    },
+    "files-from-verbatim": {
+      "type": "string"
+    },
+    "force": {
+      "type": "boolean"
+    },
+    "forget": {
+      "type": "boolean"
+    },
+    "from-insecure-no-password": {
+      "type": "boolean"
+    },
+    "from-key-hint": {
+      "type": "string"
+    },
+    "from-password-command": {
+      "type": "string"
+    },
+    "from-password-file": {
+      "type": "string"
+    },
+    "from-repo": {
+      "type": "string"
+    },
+    "from-repository-file": {
+      "type": "string"
+    },
+    "group-by": {
+      "type": "boolean"
+    },
+    "host": {
+      "type": "string"
+    },
+    "http-user-agent": {
+      "type": "string"
+    },
+    "human-readable": {
+      "type": "boolean"
+    },
+    "iexclude": {
+      "type": "string"
+    },
+    "iexclude-file": {
+      "type": "string"
+    },
+    "ignore-case": {
+      "type": "boolean"
+    },
+    "ignore-ctime": {
+      "type": "boolean"
+    },
+    "ignore-inode": {
+      "type": "boolean"
+    },
+    "iinclude": {
+      "type": "string"
+    },
+    "iinclude-file": {
+      "type": "string"
+    },
+    "include": {
+      "type": "string"
+    },
+    "include-file": {
+      "type": "string"
+    },
+    "include-xattr": {
+      "type": "string"
+    },
+    "insecure-no-password": {
+      "type": "boolean"
+    },
+    "insecure-tls": {
+      "type": "boolean"
+    },
+    "json": {
+      "type": "boolean"
+    },
+    "keep-daily": {
+      "type": "integer"
+    },
+    "keep-hourly": {
+      "type": "integer"
+    },
+    "keep-last": {
+      "type": "integer"
+    },
+    "keep-monthly": {
+      "type": "integer"
+    },
+    "keep-tag": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "keep-weekly": {
+      "type": "integer"
+    },
+    "keep-within": {
+      "type": "string"
+    },
+    "keep-within-daily": {
+      "type": "string"
+    },
+    "keep-within-hourly": {
+      "type": "string"
+    },
+    "keep-within-monthly": {
+      "type": "string"
+    },
+    "keep-within-weekly": {
+      "type": "string"
+    },
+    "keep-within-yearly": {
+      "type": "string"
+    },
+    "keep-yearly": {
+      "type": "integer"
+    },
+    "key-hint": {
+      "type": "boolean"
+    },
+    "latest": {
+      "type": "integer"
+    },
+    "limit-download": {
+      "type": "boolean"
+    },
+    "limit-upload": {
+      "type": "boolean"
+    },
+    "long": {
+      "type": "boolean"
+    },
+    "max-age": {
+      "type": "boolean"
+    },
+    "max-repack-size": {
+      "type": "string"
+    },
+    "max-unused": {
+      "type": "boolean"
+    },
+    "metadata": {
+      "type": "boolean"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "ncdu": {
+      "type": "boolean"
+    },
+    "new-host": {
+      "type": "string"
+    },
+    "new-time": {
+      "type": "string"
+    },
+    "newest": {
+      "type": "string"
+    },
+    "no-cache": {
+      "type": "boolean"
+    },
+    "no-default-permissions": {
+      "type": "boolean"
+    },
+    "no-extra-verify": {
+      "type": "boolean"
+    },
+    "no-lock": {
+      "type": "boolean"
+    },
+    "no-scan": {
+      "type": "boolean"
+    },
+    "no-size": {
+      "type": "boolean"
+    },
+    "oldest": {
+      "type": "string"
+    },
+    "one-file-system": {
+      "type": "boolean"
+    },
+    "option": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "overwrite": {
+      "type": "boolean"
+    },
+    "owner-root": {
+      "type": "boolean"
+    },
+    "pack": {
+      "type": "string"
+    },
+    "pack-size": {
+      "type": "string"
+    },
+    "parent": {
+      "type": "boolean"
+    },
+    "password-command": {
+      "type": "string"
+    },
+    "password-file": {
+      "type": "string"
+    },
+    "path": {
+      "type": "boolean"
+    },
+    "path-template": {
+      "type": "boolean"
+    },
+    "prune": {
+      "type": "boolean"
+    },
+    "quiet": {
+      "type": "boolean"
+    },
+    "read-concurrency": {
+      "type": "integer"
+    },
+    "read-data": {
+      "type": "boolean"
+    },
+    "read-data-subset": {
+      "type": "boolean"
+    },
+    "recursive": {
+      "type": "boolean"
+    },
+    "remove": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "remove-all": {
+      "type": "boolean"
+    },
+    "repack-cacheable-only": {
+      "type": "boolean"
+    },
+    "repack-small": {
+      "type": "boolean"
+    },
+    "repack-smaller-than": {
+      "type": "boolean"
+    },
+    "repack-uncompressed": {
+      "type": "boolean"
+    },
+    "repo": {
+      "type": "string"
+    },
+    "repository-file": {
+      "type": "string"
+    },
+    "repository-version": {
+      "type": "string"
+    },
+    "retry-lock": {
+      "type": "string"
+    },
+    "reverse": {
+      "type": "boolean"
+    },
+    "set": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "show-pack-id": {
+      "type": "boolean"
+    },
+    "skip-if-unchanged": {
+      "type": "boolean"
+    },
+    "snapshot": {
+      "type": "boolean"
+    },
+    "snapshot-summary": {
+      "type": "boolean"
+    },
+    "sort": {
+      "type": "string"
+    },
+    "sparse": {
+      "type": "boolean"
+    },
+    "stdin": {
+      "type": "boolean"
+    },
+    "stdin-filename": {
+      "type": "boolean"
+    },
+    "stdin-from-command": {
+      "type": "boolean"
+    },
+    "stuck-request-timeout": {
+      "type": "string"
+    },
+    "tag": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "target": {
+      "type": "boolean"
+    },
+    "time": {
+      "type": "boolean"
+    },
+    "time-template": {
+      "type": "boolean"
+    },
+    "tls-client-cert": {
+      "type": "string"
+    },
+    "tree": {
+      "type": "string"
+    },
+    "unsafe-allow-remove-all": {
+      "type": "boolean"
+    },
+    "unsafe-recover-no-free-space": {
+      "type": "string"
+    },
+    "verbose": {
+      "type": "boolean"
+    },
+    "verify": {
+      "type": "boolean"
+    },
+    "with-atime": {
+      "type": "boolean"
+    },
+    "with-cache": {
+      "type": "boolean"
+    }
+  }
+}

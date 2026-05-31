@@ -28,6 +28,15 @@
 
           # restic-in-peace shells out to restic; make sure it's on PATH.
           nativeBuildInputs = [ pkgs.makeWrapper ];
+
+          # Regenerate the flag-types snapshot against the exact restic this
+          # flake builds against so the strict schema matches that version.
+          preBuild = ''
+            python scripts/generate_restic_flags.py \
+              ${pkgs.restic}/bin/restic \
+              restic_in_peace/restic_flags.json
+          '';
+
           postFixup = ''
             wrapProgram $out/bin/restic-in-peace \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.restic ]}

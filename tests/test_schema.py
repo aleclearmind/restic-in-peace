@@ -90,9 +90,7 @@ def test_missing_file_raises_config_error(tmp_path: Path) -> None:
         profile.load_config(str(tmp_path / "missing.yaml"))
 
 
-def test_stray_subsection_is_dropped(tmp_path: Path) -> None:
-    # `retention:` is a resticprofile-only sub-section. It must not leak
-    # through to_argv as `--retention <dict-repr>`.
+def test_resticprofile_retention_section_rejected(tmp_path: Path) -> None:
     path = _write(tmp_path, {
         "profiles": {
             "p1": {
@@ -102,11 +100,26 @@ def test_stray_subsection_is_dropped(tmp_path: Path) -> None:
             },
         },
     })
-    config = profile.load_config(path)
-    settings, _ = profile.resolve(config, "p1", "ls")
+    with pytest.raises(profile.ConfigError, match="retention"):
+        profile.load_config(path)
+
+
+def test_typo_in_restic_flag_rejected(tmp_path: Path) -> None:
+    # `repsitory` is a typo of `repository` (and not a real restic flag).
+    path = _write(tmp_path, {"profiles": {"p1": {"repsitory": "/x"}}})
+    with pytest.raises(profile.ConfigError, match="repsitory"):
+        profile.load_config(path)
+
+
+def test_resolve_drops_stray_subsection_even_if_schema_permissive() -> None:
+    # Defensive: if the snapshot were ever absent the schema falls back to
+    # permissive; resolve() still drops stray dict-valued sub-sections so
+    # they cannot be translated to a restic flag.
+    settings, _ = profile.resolve(
+        {"profiles": {"p1": {"repository": "/x", "retention": {"keep-daily": 7}}}},
+        "p1", "ls",
+    )
     assert "retention" not in settings
-    flags, _ = profile.to_argv(settings, "ls")
-    assert "--retention" not in flags
 
 
 def test_rip_sample_yaml_validates() -> None:
