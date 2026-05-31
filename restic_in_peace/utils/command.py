@@ -33,12 +33,13 @@ def build_restic_command(
             continue
 
         restic_args.append("--" + name.replace("_", "-"))
+        # isinstance(True, int) is True, so bool must be checked first.
+        if isinstance(val, bool):
+            continue
         if isinstance(val, (str, int)):
             val = str(val)
         elif isinstance(val, list):
             val = " ".join(str(v) for v in val)
-        elif val is True:
-            continue
         else:
             error = f"Argument {name} is not string, int or list or True (actual type {type(val)})"
             logger.error(error)
