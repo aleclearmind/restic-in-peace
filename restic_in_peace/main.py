@@ -5,6 +5,7 @@ import json
 import signal
 import subprocess
 import sys
+import shlex
 
 from . import description
 from . import utils
@@ -146,6 +147,8 @@ def run_backup(args, unparsed_args):
         force_json=True,
         force_verbose=True,
     )
+
+    logger.info(shlex.join(backup_command))
 
     process = subprocess.Popen(backup_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
@@ -324,7 +327,7 @@ def main(args, unparsed_args):
             args.command, args, additional_argparse_arguments=["tag"], additional_unparsed_arguments=unparsed_args
         )
 
-        logger.debug(f"About to execute {restic_command}")
+        logger.info(f"About to execute {shlex.join(restic_command)}")
 
         utils.log_event_to_monitors(
             "command_started",
