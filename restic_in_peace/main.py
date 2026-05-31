@@ -281,6 +281,13 @@ def main(args, unparsed_args):
             exit(1)
         exit(run_backup_run(unparsed_args[0]))
 
+    if args.command == "collect-non-backuped-files":
+        from .collect import run as collect_run
+        if len(unparsed_args) < 2:
+            logger.error("collect-non-backuped-files requires a config path and an output directory")
+            exit(1)
+        exit(collect_run(unparsed_args[0], unparsed_args[1]))
+
     if args.tee_restic_logs:
         destination = args.tee_restic_logs.replace("@CMD", args.command)
         stdout_destination = destination.replace("@FD", "stdout")

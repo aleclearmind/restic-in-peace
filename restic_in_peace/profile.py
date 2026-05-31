@@ -72,9 +72,17 @@ def has_section(config, name, section):
     return False
 
 
-def to_argv(settings, command):
+# Keys rip understands but restic does not — filter these out when invoking
+# restic directly (e.g. from the collect-non-backuped-files command).
+RIP_ONLY = frozenset({
+    "added-size-limit", "skip-on-battery", "wifi-whitelist", "wifi-blacklist",
+    "monitor-url", "desktop-notifications", "tee-restic-logs", "loglevel",
+})
+
+
+def to_argv(settings, command, drop_keys=frozenset()):
     """Translate `settings` (from `resolve`) to flag args and positional args."""
-    settings = dict(settings)
+    settings = {k: v for k, v in settings.items() if k not in drop_keys}
     sources = settings.pop("source", []) if command == "backup" else []
     if isinstance(sources, str):
         sources = [sources]

@@ -1,0 +1,157 @@
+import json
+import os
+import re
+import subprocess
+from pathlib import Path
+
+import yaml
+
+from . import profile as profile_mod
+from .utils import logger
+
+
+# Top-level paths skipped when walking from /. Override the walk root entirely
+# via RIP_COLLECT_ROOTS (colon-separated).
+SYSTEM_DIRS = frozenset({
+    "/nix", "/sys", "/proc", "/dev", "/bin", "/usr",
+    "/tmp", "/lib", "/lib64", "/mnt", "/run",
+})
+
+
+def _profiles_inheriting(config, parent):
+    profiles = config.get("profiles", {})
+    return sorted(
+        name for name, settings in profiles.items()
+        if isinstance(settings, dict) and settings.get("inherit") == parent
+    )
+
+
+def _restic_command(config, name, command, extra_args=()):
+    settings, env = profile_mod.resolve(config, name, command)
+    flags, positionals = profile_mod.to_argv(settings, command, drop_keys=profile_mod.RIP_ONLY)
+    return ["restic", command] + flags + list(extra_args) + positionals, env
+
+
+def _run_restic(cmd, env_overrides, **kwargs):
+    env = os.environ.copy()
+    env.update({k: str(v) for k, v in env_overrides.items()})
+    return subprocess.run(cmd, env=env, **kwargs)
+
+
+def _walk_roots():
+    override = os.environ.get("RIP_COLLECT_ROOTS")
+    if override:
+        return [Path(p) for p in override.split(":") if p]
+    return [p for p in Path("/").iterdir() if str(p) not in SYSTEM_DIRS]
+
+
+def _collect_files(roots):
+    all_files = set()
+    for root in roots:
+        for path in root.rglob("*"):
+            try:
+                if path.is_file():
+                    all_files.add(str(path))
+            except OSError:
+                continue
+    return all_files
+
+
+def _build_filter(config, profiles, all_files):
+    excludes = []
+    sources = []
+    markers = set()
+    for name in profiles:
+        settings, _ = profile_mod.resolve(config, name, "backup")
+
+        excl = settings.get("exclude") or []
+        if isinstance(excl, str):
+            excl = [excl]
+        excludes.extend(re.sub(r"\*", r".*", e) for e in excl)
+
+        srcs = settings.get("source") or []
+        if isinstance(srcs, str):
+            srcs = [srcs]
+        sources.extend(srcs)
+
+        m = settings.get("exclude-if-present") or []
+        if isinstance(m, str):
+            m = [m]
+        markers.update(m)
+
+    parts = [e for e in excludes if e not in sources]
+
+    for marker in markers:
+        suffix = f"/{marker}"
+        parts.extend(sorted({f[: -len(suffix)] for f in all_files if f.endswith(suffix)}))
+
+    if not parts:
+        return None
+    return re.compile("^(" + "|".join(parts) + ")")
+
+
+def run(config_path, output_dir):
+    config_path = os.path.abspath(config_path)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(config_path) as f:
+        config = yaml.safe_load(f) or {}
+
+    profiles = _profiles_inheriting(config, "common")
+
+    backed_up = set()
+    log_files = []
+
+    for profile in profiles:
+        logger.info(f"Collecting files backed up by {profile}")
+
+        unlock_cmd, env = _restic_command(config, profile, "unlock")
+        _run_restic(unlock_cmd, env, capture_output=True)
+
+        backup_cmd, env = _restic_command(
+            config, profile, "backup",
+            extra_args=("--dry-run", "--verbose=2", "--json"),
+        )
+        result = _run_restic(backup_cmd, env, capture_output=True, text=True)
+
+        log_path = output_dir / f"{profile}.log.json"
+        log_lines = [line for line in result.stdout.splitlines() if "message_type" in line]
+        log_path.write_text("\n".join(log_lines) + "\n")
+        log_files.append(log_path)
+
+        for line in log_lines:
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if msg.get("action") == "new" and msg.get("item"):
+                backed_up.add(msg["item"])
+
+    (output_dir / "all-backuped-files").write_text("\n".join(sorted(backed_up)) + "\n")
+
+    roots = _walk_roots()
+    logger.info(f"Collecting all files in {[str(r) for r in roots]}")
+    all_files = _collect_files(roots)
+    (output_dir / "all-files").write_text("\n".join(sorted(all_files)) + "\n")
+
+    non_backed_up = sorted(all_files - backed_up)
+    (output_dir / "non-backuped-files").write_text("\n".join(non_backed_up) + "\n")
+
+    pattern = _build_filter(config, profiles, all_files)
+    implicit = non_backed_up if pattern is None else [p for p in non_backed_up if not pattern.match(p)]
+    (output_dir / "implicitly-non-backuped-files").write_text("\n".join(implicit) + "\n")
+
+    for log_path in log_files:
+        lines = log_path.read_text().splitlines()
+        if len(lines) < 2:
+            continue
+        try:
+            summary = json.loads(lines[-2])
+        except json.JSONDecodeError:
+            continue
+        size = summary.get("data_added_packed", 0)
+        print(f"{log_path}: {size // (1024**3)} GB")
+
+    logger.info("All done")
+    return 0
