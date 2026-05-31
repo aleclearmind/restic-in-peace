@@ -21,7 +21,7 @@ def test_backup_via_profile_creates_snapshot(
     })
 
     result = subprocess.run(
-        [rip_bin, "--config", str(config), "--name", "p1", "backup"],
+        [rip_bin, "--config", str(config), "--name", "p1", "restic", "backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -48,7 +48,7 @@ def test_profile_inheritance_overrides(
     })
 
     result = subprocess.run(
-        [rip_bin, "--config", str(config), "--name", "p1", "backup"],
+        [rip_bin, "--config", str(config), "--name", "p1", "restic", "backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -71,7 +71,7 @@ def test_profile_size_limit_aborts(
     })
 
     result = subprocess.run(
-        [rip_bin, "--config", str(config), "--name", "p1", "backup"],
+        [rip_bin, "--config", str(config), "--name", "p1", "restic", "backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode != 0
@@ -97,13 +97,13 @@ def test_forget_translates_policy_flags(
     for content in ("v1\n", "v2\n", "v3\n"):
         (fake_home / "doc.txt").write_text(content)
         subprocess.run(
-            [rip_bin, "--config", str(config), "--name", "p1", "backup"],
+            [rip_bin, "--config", str(config), "--name", "p1", "restic", "backup"],
             capture_output=True, text=True, env=test_env, check=True,
         )
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 3
 
     result = subprocess.run(
-        [rip_bin, "--config", str(config), "--name", "p1", "forget"],
+        [rip_bin, "--config", str(config), "--name", "p1", "restic", "forget"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -113,7 +113,7 @@ def test_forget_translates_policy_flags(
 def test_unknown_profile_fails(rip_bin, write_config, test_env):
     config = write_config({"profiles": {"p1": {"repository": "/x"}}})
     result = subprocess.run(
-        [rip_bin, "--config", str(config), "--name", "missing", "snapshots"],
+        [rip_bin, "--config", str(config), "--name", "missing", "restic", "snapshots"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode != 0

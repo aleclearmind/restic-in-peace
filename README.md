@@ -20,7 +20,7 @@ your laptop.
 Most operations are done by invoking rip with `--config <file> --name <profile>`:
 
 ```
-restic-in-peace --config rip.yaml --name <profile> <restic-command> [args...]
+restic-in-peace --config rip.yaml --name <profile> restic <restic-command> [args...]
 ```
 
 `<restic-command>` is any restic command (`backup`, `snapshots`, `restore`,
@@ -37,7 +37,7 @@ read-only copy of the backup using FUSE. You will find all the snapshots,
 organized by timestamp, tag, id and hostname.
 
 ```
-restic-in-peace --config rip.yaml --name <profile> mount /mount/point
+restic-in-peace --config rip.yaml --name <profile> restic mount /mount/point
 ```
 
 Note: to unmount the backup just terminate restic (CTRL+C). Before
@@ -50,7 +50,7 @@ If you want to restore files directly, first find the snapshot that
 contains them:
 
 ```
-restic-in-peace --config rip.yaml --name <profile> snapshots
+restic-in-peace --config rip.yaml --name <profile> restic snapshots
 ```
 
 You can also use the special snapshot id `latest`.
@@ -58,7 +58,7 @@ You can also use the special snapshot id `latest`.
 Use the `restore` command to extract some files:
 
 ```
-restic-in-peace --config rip.yaml --name <profile> \
+restic-in-peace --config rip.yaml --name <profile> restic \
     restore <snapshot_id> \
     --include <path> --include <otherpath> \
     --target <target_dir> \
@@ -75,7 +75,7 @@ Your repo might have a stale lock. Ensure no restic process is running,
 then remove the lock with:
 
 ```
-restic-in-peace --config rip.yaml --name <profile> unlock
+restic-in-peace --config rip.yaml --name <profile> restic unlock
 ```
 
 If this does not help, append `--loglevel DEBUG` or `--loglevel TRACE` to

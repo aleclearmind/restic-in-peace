@@ -110,7 +110,7 @@ def run(config_path: str, dry_run: bool = False, log_path: str | None = None) ->
 
             profile_failure: tuple[str, int] | None = None
             for subcommand in subcommands:
-                cmd = ["restic-in-peace", "--config", config_path, "--name", profile, subcommand]
+                cmd = ["restic-in-peace", "--config", config_path, "--name", profile, "restic", subcommand]
                 if dry_run and subcommand in ("backup", "forget"):
                     cmd.append("--dry-run")
                 rc = _stream(cmd, sinks)

@@ -103,7 +103,7 @@ to that command.
 
 Initialize the repository with:
 ```
-restic-in-peace --config rip.yaml --name <profile> init
+restic-in-peace --config rip.yaml --name <profile> restic init
 ```
 
 If you configured a sensible size limit in your configuration the first
@@ -114,14 +114,14 @@ the watchdog.
 restic-in-peace \
     --config ~/.config/restic-in-peace/rip.yaml \
     --name <profile> \
-    backup \
+    restic backup \
     --added-size-limit 0
 ```
 
 Re-run the backup. This should take much less time:
 
 ```
-restic-in-peace --config rip.yaml --name <profile> backup
+restic-in-peace --config rip.yaml --name <profile> restic backup
 ```
 
 # Automation with systemd-timer
@@ -155,7 +155,7 @@ First check the backup consistency. This does not read data, unless the
 it should **never** fail.
 
 ```
-restic-in-peace --config rip.yaml --name <profile> check
+restic-in-peace --config rip.yaml --name <profile> restic check
 ```
 
 You should mount the backup and inspect it to ensure your important stuff

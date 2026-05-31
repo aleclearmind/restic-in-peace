@@ -9,7 +9,7 @@ def test_backup_creates_snapshot(
     (fake_home / "doc.txt").write_text("hello world\n")
 
     result = subprocess.run(
-        [rip_bin, "backup", "-r", str(restic_repo), str(fake_home)],
+        [rip_bin, "restic", "backup", "-r", str(restic_repo), str(fake_home)],
         capture_output=True, text=True, env=test_env_with_password,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -23,7 +23,7 @@ def test_size_limit_aborts_backup(
 
     result = subprocess.run(
         [
-            rip_bin, "backup",
+            rip_bin, "restic", "backup",
             "-r", str(restic_repo),
             "--added-size-limit", "1KB",
             str(fake_home),

@@ -26,127 +26,79 @@ return_codes: dict[str, int] = {
 argparser = argparse.ArgumentParser(
     prog="restic-in-peace",
     description=description,
-    epilog="""\
-rip-specific subcommands (anything else is passed to restic; refer to `man restic`):
-  fix-home [--strict] <config>
-      Emit a bash script that links the dotfiles declared in fix-homes/$USER.
-      --strict makes it exit non-zero if any link/move would be needed.
-  run-backup [--dry-run] [--log-path DIR] <config>
-      For each profile inheriting from `common`, run (in order):
-      restic-in-peace fix-home --strict, unlock, backup,
-      forget (only if the profile defines a `forget:` section), check.
-      With --dry-run: skip unlock and check, and pass --dry-run to
-      backup and forget so restic simulates. rip's own size-limit /
-      battery / network gates still apply.
-      --log-path overrides run-backup.log-path from the config.
-  collect-non-backuped-files <config> <output-dir>
-      Walk the filesystem, run a dry-run backup of every common-inheriting
-      profile, and list files present on disk that none of the profiles
-      would back up.
-
-run-backup automatically writes an ncdu v1.2 JSON of every file restic
-would add per profile next to its log file (one timestamped directory
-per run) when log-path is set. Open with `ncdu -f <path>`.
-
-profile-driven invocation:
-  restic-in-peace --config <FILE> --name <PROFILE> <command> [args...]
-  Loads <PROFILE> from <FILE>, translates settings to flags, then runs
-  <command> with those flags (and any CLI flags you pass, which override).
-""",
-    formatter_class=argparse.RawDescriptionHelpFormatter,
 )
-argparser.add_argument("command", help="restic command or rip subcommand (see below)")
-
-# --config/--name/--strict are intercepted before argparser runs, but listed
-# here so they appear in --help.
+# --config/--name are intercepted before argparser runs (see entrypoint), but
+# listed here so they appear in --help.
 argparser.add_argument("-c", "--config", metavar="FILE", help="path to rip.yaml (use with --name)")
 argparser.add_argument("-n", "--name", metavar="PROFILE", help="profile name within --config")
-argparser.add_argument(
-    "--strict", action="store_true",
-    help="for fix-home: fail if any action would be needed (no bash emitted)",
-)
-argparser.add_argument(
-    "--dry-run", action="store_true", dest="dry_run",
-    help="for backup/forget: pass --dry-run to restic; "
-    "for run-backup: skip unlock+check and pass --dry-run to backup+forget",
-)
-argparser.add_argument(
-    "--log-path", dest="log_path", metavar="DIR",
-    help="for run-backup: directory where the dated <run> subdir goes "
-    "(overrides run-backup.log-path in the config)",
-)
-
-# These options are specific of this tool and must not be passed to restic
-argparser.add_argument(
-    "--added-size-limit",
-    type=human_numbers.parse,
-    help="Maximim number of new bytes to backup. " "If restic counts more than this, the backup is aborted",
-)
-argparser.add_argument(
-    "--wifi-whitelist",
-    action="append",
-    default=[],
-    help="Skip the backup if this parameter is provided and the computer is not "
-    "connected to a network matching one of the provided regexes. "
-    "Can be speficied more than once",
-)
-argparser.add_argument(
-    "--wifi-blacklist",
-    action="append",
-    default=[],
-    help="Skip the backup if the computer is connected to a network "
-    "matching one of the provided regexes. "
-    "Can be specified more than once",
-)
-argparser.add_argument(
-    "--skip-on-battery",
-    action="store_true",
-    dest="skip_on_battery",
-    help="Skip the backup if the computer is battery powered",
-)
-argparser.add_argument(
-    "--no-skip-on-battery",
-    action="store_false",
-    dest="skip_on_battery",
-    help="Force the backup even if the computer is battery powered",
-)
-argparser.add_argument(
-    "--monitor-url",
-    action="append",
-    default=[],
-    help="Perform an HTTP POST request to this URL to report events. " "Can be specified more than once",
-)
-argparser.add_argument(
-    "--desktop-notifications",
-    action="store_true",
-    help="Send desktop notification to any org.freedesktop.Notification compliant DBUS daemon",
-)
-argparser.add_argument(
-    "--tee-restic-logs",
-    metavar="FILE",
-    help="Write restic output to this file. " "@CMD is substituted with the command, @FD with stdout or stderr",
-)
 argparser.add_argument("--loglevel", default="INFO", help="Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
-# Restic options which we need to parse to invoke commands other than the original one
-argparser.add_argument(
-    "--tag",
-    action="append",
-    help="Only the latest snapshot having this tag will be considered "
-    "as baseline for previous backup size calculation. "
-    "The option will also be passed to restic."
-    "Supplying this option is highly recommended",
+subparsers = argparser.add_subparsers(dest="command", required=True, metavar="<subcommand>")
+
+# `restic` — runs a restic command (the `backup` subcommand goes through rip's
+# size-limit/battery/network/notification pipeline; the rest pass through).
+_restic = subparsers.add_parser(
+    "restic",
+    help="run a restic command; `backup` goes through rip's gates and notifications",
 )
-argparser.add_argument("-r", "--repo", help="Restic repository")
-argparser.add_argument("-p", "--password-file", help=argparse.SUPPRESS)
-argparser.add_argument("--password-command", help=argparse.SUPPRESS)
-argparser.add_argument(
-    "-v",
-    "--verbose",
-    nargs="?",
-    metavar="LEVEL",
-    help="Verbose output (passed to restic, for this wrapper use --loglevel)",
+_restic.add_argument("--added-size-limit", type=human_numbers.parse,
+    help="abort backup if restic would add more than this many bytes")
+_restic.add_argument("--wifi-whitelist", action="append", default=[],
+    help="skip backup unless the active wifi matches one of these regexes (repeatable)")
+_restic.add_argument("--wifi-blacklist", action="append", default=[],
+    help="skip backup if the active wifi matches one of these regexes (repeatable)")
+_restic.add_argument("--skip-on-battery", action="store_true", dest="skip_on_battery",
+    help="skip the backup if the computer is on battery")
+_restic.add_argument("--no-skip-on-battery", action="store_false", dest="skip_on_battery",
+    help="force the backup even if the computer is on battery")
+_restic.add_argument("--monitor-url", action="append", default=[],
+    help="POST event JSON to this URL on backup transitions (repeatable)")
+_restic.add_argument("--desktop-notifications", action="store_true",
+    help="send notify-send notifications on backup transitions")
+_restic.add_argument("--tee-restic-logs", metavar="FILE",
+    help="duplicate restic's output to this file (@CMD/@FD substituted)")
+_restic.add_argument("--tag", action="append",
+    help="restic tag (also used as the size-limit baseline filter; highly recommended)")
+_restic.add_argument("-r", "--repo", help="restic repository")
+_restic.add_argument("-p", "--password-file", help=argparse.SUPPRESS)
+_restic.add_argument("--password-command", help=argparse.SUPPRESS)
+_restic.add_argument("-v", "--verbose", nargs="?", metavar="LEVEL",
+    help="verbose output (forwarded to restic)")
+_restic.add_argument("--dry-run", action="store_true", dest="dry_run",
+    help="forward --dry-run to restic (supported by backup/forget/prune)")
+# Everything after the rip flags is the restic subcommand + restic args.
+# parse_known_args drops them into `remaining`; we re-extract the subcommand
+# in entrypoint and stash the rest as unparsed.
+
+# `fix-home`
+_fix_home = subparsers.add_parser(
+    "fix-home",
+    help="emit a bash script (or --strict-check) for fix-homes/$USER dotfile symlinks",
 )
+_fix_home.add_argument("--strict", action="store_true",
+    help="fail non-zero if any move/link would be needed; emit no bash")
+_fix_home.add_argument("config", nargs="?", default="rip.yaml",
+    help="config file (default: rip.yaml in CWD)")
+
+# `run-backup`
+_run_backup = subparsers.add_parser(
+    "run-backup",
+    help="orchestrate fix-home + unlock + backup + forget + check for every "
+         "profile inheriting from common; write per-profile ncdu diagnostic",
+)
+_run_backup.add_argument("--dry-run", action="store_true", dest="dry_run",
+    help="skip unlock and check, pass --dry-run to backup and forget")
+_run_backup.add_argument("--log-path", dest="log_path", metavar="DIR",
+    help="directory where the dated <run> subdir goes (overrides run-backup.log-path)")
+_run_backup.add_argument("config", help="config file")
+
+# `collect-non-backuped-files`
+_collect = subparsers.add_parser(
+    "collect-non-backuped-files",
+    help="list files present on disk that no common-inheriting profile would back up",
+)
+_collect.add_argument("config", help="config file")
+_collect.add_argument("output_dir", help="output directory")
 
 
 def get_latest_snapshot_stats(args: argparse.Namespace) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
@@ -318,23 +270,18 @@ def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None
 def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
     if args.command == "fix-home":
         from .fix_home import run as fix_home_run
-        config_path = unparsed_args[0] if unparsed_args else "rip.yaml"
-        exit(fix_home_run(config_path, strict=args.strict))
+        exit(fix_home_run(args.config, strict=args.strict))
 
     if args.command == "run-backup":
         from .run_backup import run as run_backup_run
-        if not unparsed_args:
-            logger.error("run-backup requires a config path argument")
-            exit(1)
-        exit(run_backup_run(unparsed_args[0], dry_run=args.dry_run, log_path=args.log_path))
+        exit(run_backup_run(args.config, dry_run=args.dry_run, log_path=args.log_path))
 
     if args.command == "collect-non-backuped-files":
         from .collect import run as collect_run
-        if len(unparsed_args) < 2:
-            logger.error("collect-non-backuped-files requires a config path and an output directory")
-            exit(1)
-        exit(collect_run(unparsed_args[0], unparsed_args[1]))
+        exit(collect_run(args.config, args.output_dir))
 
+    # Everything below this point assumes args.command is the restic subcommand
+    # (entrypoint moved restic's positional subcommand into args.command).
     if args.tee_restic_logs:
         destination = args.tee_restic_logs.replace("@CMD", args.command)
         stdout_destination = destination.replace("@FD", "stdout")
@@ -473,26 +420,44 @@ def entrypoint() -> None:
         if not (config_path and profile_name):
             sys.stderr.write("--config and --name must be supplied together\n")
             sys.exit(2)
-        if not argv:
-            sys.stderr.write("--config/--name require a command\n")
+        if not argv or argv[0] != "restic":
+            sys.stderr.write("--config/--name require the `restic` subcommand\n")
             sys.exit(2)
+        if len(argv) < 2:
+            sys.stderr.write("`restic` requires a subcommand\n")
+            sys.exit(2)
+
+        restic_subcmd = argv[1]
+        cli_rest = argv[2:]
 
         from . import profile as profile_mod
         try:
             config = profile_mod.load_config(config_path)
-            settings, env = profile_mod.resolve(config, profile_name, argv[0])
+            settings, env = profile_mod.resolve(config, profile_name, restic_subcmd)
         except (KeyError, ValueError, profile_mod.ConfigError) as e:
             sys.stderr.write(f"{e}\n")
             sys.exit(1)
 
-        flags, positionals = profile_mod.to_argv(settings, argv[0])
+        flags, positionals = profile_mod.to_argv(settings, restic_subcmd)
         for k, v in env.items():
             os.environ.setdefault(k, str(v))
 
-        # Profile flags first, then any CLI flags (so the CLI overrides for
-        # non-list args), then positional sources at the end.
-        argv = [argv[0]] + flags + argv[1:] + positionals
+        # Profile flags first (parsed by argparser), then any CLI flags / args
+        # the user passed (which override on non-list flags), then positional
+        # sources at the end.
+        argv = ["restic", restic_subcmd] + flags + cli_rest + positionals
 
     arguments, remaining = argparser.parse_known_args(argv)
     utils.logging.set_level(arguments.loglevel)
+
+    # If the user invoked `restic <subcmd>`, the actual restic subcommand sits
+    # as the first remaining positional. Promote it to args.command so the
+    # existing dispatch (backup pipeline vs passthrough) keeps working.
+    if arguments.command == "restic":
+        if not remaining:
+            sys.stderr.write("`restic` requires a subcommand\n")
+            sys.exit(2)
+        arguments.command = remaining[0]
+        remaining = remaining[1:]
+
     main(arguments, remaining)

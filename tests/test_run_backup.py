@@ -81,7 +81,7 @@ def test_runs_forget_when_section_present(
     for content in ("v1\n", "v2\n"):
         (fake_home / "doc.txt").write_text(content)
         subprocess.run(
-            [rip_bin, "--config", str(config_path), "--name", "p1", "backup"],
+            [rip_bin, "--config", str(config_path), "--name", "p1", "restic", "backup"],
             capture_output=True, text=True, env=test_env, check=True,
         )
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 2
