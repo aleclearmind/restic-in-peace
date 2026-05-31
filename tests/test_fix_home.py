@@ -5,7 +5,7 @@ def test_emits_bash_for_pending_actions(fake_home, current_user, write_config, r
     (fake_home / ".dotfiles").mkdir()
     (fake_home / ".vimrc").write_text("set nu\n")
 
-    config = write_config(**{
+    config = write_config({
         "fix-homes": {
             current_user: {
                 "ignore": [".dotfiles"],
@@ -27,7 +27,7 @@ def test_strict_fails_when_action_needed(fake_home, current_user, write_config, 
     (fake_home / ".dotfiles").mkdir()
     (fake_home / ".vimrc").write_text("set nu\n")
 
-    config = write_config(**{
+    config = write_config({
         "fix-homes": {
             current_user: {
                 "ignore": [".dotfiles"],
@@ -51,7 +51,7 @@ def test_strict_succeeds_when_state_is_clean(fake_home, current_user, write_conf
     (fake_home / ".dotfiles" / ".vimrc").write_text("set nu\n")
     (fake_home / ".vimrc").symlink_to(".dotfiles/.vimrc")
 
-    config = write_config(**{
+    config = write_config({
         "fix-homes": {
             current_user: {
                 "ignore": [".dotfiles"],
@@ -68,7 +68,7 @@ def test_strict_succeeds_when_state_is_clean(fake_home, current_user, write_conf
 
 
 def test_no_user_section_fails(fake_home, write_config, rip_bin, test_env):
-    config = write_config(**{"fix-homes": {"some-other-user": {".dotfiles": [".vimrc"]}}})
+    config = write_config({"fix-homes": {"some-other-user": {".dotfiles": [".vimrc"]}}})
     env = {**test_env, "USER": "nonexistent-user-xyz"}
 
     result = subprocess.run(

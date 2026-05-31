@@ -1,7 +1,7 @@
-import json
+import yaml
 
 
-# Resticprofile config keys that map to a different restic flag name.
+# Config keys that map to a different restic flag name.
 KEY_ALIASES = {
     "repository": "repo",
 }
@@ -15,24 +15,17 @@ COMMAND_SECTIONS = frozenset({
     "stats", "tag", "diff", "copy", "rebuild-index", "cat",
 })
 
-# Keys we recognize as resticprofile-only and silently drop. Forwarding them
-# to restic would make restic reject the invocation.
-RESTICPROFILE_ONLY = frozenset({
-    "run-before", "run-after", "check-after", "retention",
-    "lock-wait", "force-inactive-lock", "description",
-    "ignore-on-battery", "ignore-on-battery-less-than",
-})
-
 
 def load_config(path):
     with open(path) as f:
-        return json.load(f)
+        return yaml.safe_load(f) or {}
 
 
 def resolve(config, name, command):
     """Return (settings, env) for `command` under profile `name`, applying inheritance."""
-    if name not in config:
-        raise KeyError(f"Profile {name!r} not found in config")
+    profiles = config.get("profiles", {})
+    if name not in profiles:
+        raise KeyError(f"Profile {name!r} not found")
 
     chain = []
     seen = set()
@@ -41,7 +34,7 @@ def resolve(config, name, command):
         if current in seen:
             raise ValueError(f"Inheritance cycle involving {current!r}")
         seen.add(current)
-        chain.append(config[current])
+        chain.append(profiles[current])
         current = chain[-1].get("inherit")
 
     merged = {}
@@ -60,9 +53,6 @@ def resolve(config, name, command):
     for section in COMMAND_SECTIONS:
         merged.pop(section, None)
     merged.update(command_settings)
-
-    for key in RESTICPROFILE_ONLY:
-        merged.pop(key, None)
 
     env = merged.pop("env", {})
     return merged, env

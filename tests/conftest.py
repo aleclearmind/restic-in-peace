@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 def _which(name, env_var):
@@ -67,9 +68,9 @@ def test_env(rip_bin, fake_home, current_user):
 
 @pytest.fixture
 def write_config(tmp_path):
-    def _write(**sections):
-        path = tmp_path / "resticprofile.json"
-        path.write_text(json.dumps(sections, indent=2))
+    def _write(config):
+        path = tmp_path / "rip.yaml"
+        path.write_text(yaml.safe_dump(config, default_flow_style=False))
         return path
 
     return _write

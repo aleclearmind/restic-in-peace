@@ -1,9 +1,10 @@
-import json
 import os
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import yaml
 
 from .utils import logger
 
@@ -39,12 +40,12 @@ def run(config_path):
     config_path = os.path.abspath(config_path)
     try:
         with open(config_path) as f:
-            config = json.load(f)
+            config = yaml.safe_load(f) or {}
     except FileNotFoundError:
         logger.error(f"Config file not found: {config_path}")
         return 1
-    except json.JSONDecodeError as e:
-        logger.error(f"Could not parse {config_path} as JSON: {e}")
+    except yaml.YAMLError as e:
+        logger.error(f"Could not parse {config_path} as YAML: {e}")
         return 1
 
     try:
@@ -56,7 +57,7 @@ def run(config_path):
     fix_homes_users = list(config.get("fix-homes", {}).keys())
     profiles = sorted(
         name
-        for name, settings in config.items()
+        for name, settings in config.get("profiles", {}).items()
         if isinstance(settings, dict) and settings.get("inherit") == "common"
     )
 

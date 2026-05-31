@@ -22,6 +22,7 @@
             loguru
             requests
             notify2
+            pyyaml
           ];
 
           # restic-in-peace shells out to restic; make sure it's on PATH.
@@ -59,6 +60,7 @@
               loguru
               requests
               notify2
+              pyyaml
               setuptools
               pytest
             ]))
@@ -69,7 +71,7 @@
           nativeBuildInputs = [
             restic-in-peace
             pkgs.restic
-            (python.withPackages (ps: [ ps.pytest ]))
+            (python.withPackages (ps: [ ps.pytest ps.pyyaml ]))
           ];
         } ''
           export HOME=$TMPDIR/home

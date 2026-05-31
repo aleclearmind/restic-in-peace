@@ -271,13 +271,13 @@ def main(args, unparsed_args):
         strict = "--strict" in fh_args
         if strict:
             fh_args.remove("--strict")
-        config_path = fh_args[0] if fh_args else "resticprofile.json"
+        config_path = fh_args[0] if fh_args else "rip.yaml"
         exit(fix_home_run(config_path, strict=strict))
 
     if args.command == "run-backup":
         from .run_backup import run as run_backup_run
         if not unparsed_args:
-            logger.error("run-backup requires a resticprofile config path argument")
+            logger.error("run-backup requires a config path argument")
             exit(1)
         exit(run_backup_run(unparsed_args[0]))
 

@@ -1,7 +1,8 @@
-import json
 import os
 import sys
 from pathlib import Path
+
+import yaml
 
 
 def log(message):
@@ -22,16 +23,16 @@ def run(config_path, strict=False):
 
     try:
         with open(config_path) as f:
-            resticprofile_config = json.load(f)
+            config = yaml.safe_load(f) or {}
     except FileNotFoundError:
         log(f"Config file not found: {config_path}")
         return 1
-    except json.JSONDecodeError as e:
-        log(f"Could not parse {config_path} as JSON: {e}")
+    except yaml.YAMLError as e:
+        log(f"Could not parse {config_path} as YAML: {e}")
         return 1
 
     try:
-        configuration = resticprofile_config["fix-homes"][user]
+        configuration = config["fix-homes"][user]
     except KeyError:
         log(f"No fix-homes/{user} section in {config_path}")
         return 1

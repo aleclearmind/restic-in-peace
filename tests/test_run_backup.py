@@ -1,5 +1,6 @@
-import json
 import subprocess
+
+import yaml
 
 from .conftest import snapshot_count
 
@@ -7,18 +8,20 @@ from .conftest import snapshot_count
 def _make_config(path, log_dir, repo, password_file, source, fix_homes=None):
     config = {
         "run-backup": {"log-path": str(log_dir)},
-        "common": {
-            "repository": str(repo),
-            "password-file": str(password_file),
-        },
-        "p1": {
-            "inherit": "common",
-            "backup": {"source": [str(source)]},
+        "profiles": {
+            "common": {
+                "repository": str(repo),
+                "password-file": str(password_file),
+            },
+            "p1": {
+                "inherit": "common",
+                "backup": {"source": [str(source)]},
+            },
         },
     }
     if fix_homes is not None:
         config["fix-homes"] = fix_homes
-    path.write_text(json.dumps(config, indent=2))
+    path.write_text(yaml.safe_dump(config, default_flow_style=False))
     return path
 
 
@@ -27,7 +30,7 @@ def test_orchestrates_backup(
 ):
     (fake_home / "doc.txt").write_text("hello\n")
     log_dir = tmp_path / "logs"
-    config = _make_config(tmp_path / "rp.json", log_dir, restic_repo, restic_password, fake_home)
+    config = _make_config(tmp_path / "rip.yaml", log_dir, restic_repo, restic_password, fake_home)
 
     result = subprocess.run(
         [rip_bin, "run-backup", str(config)],
@@ -49,7 +52,7 @@ def test_aborts_when_fix_home_strict_fails(
 
     log_dir = tmp_path / "logs"
     config = _make_config(
-        tmp_path / "rp.json", log_dir, restic_repo, restic_password, fake_home,
+        tmp_path / "rip.yaml", log_dir, restic_repo, restic_password, fake_home,
         fix_homes={current_user: {"ignore": [".dotfiles"], ".dotfiles": [".vimrc"]}},
     )
 
@@ -71,7 +74,7 @@ def test_proceeds_when_fix_home_strict_passes(
 
     log_dir = tmp_path / "logs"
     config = _make_config(
-        tmp_path / "rp.json", log_dir, restic_repo, restic_password, fake_home,
+        tmp_path / "rip.yaml", log_dir, restic_repo, restic_password, fake_home,
         fix_homes={current_user: {"ignore": [".dotfiles"], ".dotfiles": [".vimrc"]}},
     )
 
