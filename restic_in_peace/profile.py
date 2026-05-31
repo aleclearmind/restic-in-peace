@@ -86,7 +86,6 @@ CONFIG_SCHEMA: dict[str, Any] = {
         "run-backup": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["log-path"],
             "properties": {
                 "log-path": {"type": "string"},
             },

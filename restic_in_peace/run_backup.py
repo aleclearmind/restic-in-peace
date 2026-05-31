@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from contextlib import ExitStack
 from datetime import datetime
 from pathlib import Path
 from typing import IO
@@ -47,21 +48,22 @@ def run(config_path: str, dry_run: bool = False) -> int:
         logger.error(str(e))
         return 1
 
-    try:
-        log_dir = Path(config["run-backup"]["log-path"])
-    except KeyError:
-        logger.error(f"Missing 'run-backup'.'log-path' in {config_path}")
-        return 1
-
+    log_dir_str = config.get("run-backup", {}).get("log-path")
     fix_homes_users = list(config.get("fix-homes", {}).keys())
     profiles = profile_mod.children_of(config, "common")
-
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / datetime.now().strftime("%Y-%m-%d")
     current_user = os.environ.get("USER") or os.environ.get("LOGNAME")
 
-    with log_path.open("a") as log_file:
-        sinks = [sys.stdout, log_file]
+    with ExitStack() as stack:
+        sinks: list[IO[str]]
+        if log_dir_str:
+            log_dir = Path(log_dir_str)
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_path = log_dir / datetime.now().strftime("%Y-%m-%d")
+            log_file = stack.enter_context(log_path.open("a"))
+            sinks = [sys.stdout, log_file]
+        else:
+            sinks = [sys.stderr]
+
         _tee(f"Starting backup on {datetime.now().ctime()}\n", sinks)
 
         for fix_user in fix_homes_users:

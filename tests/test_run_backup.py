@@ -105,6 +105,33 @@ def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
 
 
+def test_falls_back_to_stderr_when_log_path_missing(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    (fake_home / "doc.txt").write_text("hello\n")
+    config = write_config({
+        "profiles": {
+            "common": {
+                "repository": str(restic_repo),
+                "env": {"RESTIC_PASSWORD": restic_password},
+            },
+            "p1": {
+                "inherit": "common",
+                "backup": {"source": [str(fake_home)]},
+            },
+        },
+        # no run-backup section at all
+    })
+
+    result = subprocess.run(
+        [rip_bin, "run-backup", str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    assert "Backing up profile p1" in result.stderr
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+
+
 def test_aborts_when_fix_home_strict_fails(
     fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, write_config, test_env
 ):

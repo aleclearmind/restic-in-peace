@@ -54,10 +54,10 @@ def test_unknown_top_level_key_rejected(tmp_path: Path) -> None:
         profile.load_config(path)
 
 
-def test_run_backup_requires_log_path(tmp_path: Path) -> None:
+def test_run_backup_without_log_path_is_valid(tmp_path: Path) -> None:
+    # log-path is optional; run-backup falls back to stderr when missing.
     path = _write(tmp_path, {"run-backup": {}})
-    with pytest.raises(profile.ConfigError, match="log-path"):
-        profile.load_config(path)
+    assert profile.load_config(path) == {"run-backup": {}}
 
 
 def test_fix_home_value_must_be_list_of_strings(tmp_path: Path) -> None:
