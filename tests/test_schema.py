@@ -90,6 +90,25 @@ def test_missing_file_raises_config_error(tmp_path: Path) -> None:
         profile.load_config(str(tmp_path / "missing.yaml"))
 
 
+def test_stray_subsection_is_dropped(tmp_path: Path) -> None:
+    # `retention:` is a resticprofile-only sub-section. It must not leak
+    # through to_argv as `--retention <dict-repr>`.
+    path = _write(tmp_path, {
+        "profiles": {
+            "p1": {
+                "repository": "/x",
+                "env": {"RESTIC_PASSWORD": "y"},
+                "retention": {"keep-daily": 7, "prune": False},
+            },
+        },
+    })
+    config = profile.load_config(path)
+    settings, _ = profile.resolve(config, "p1", "ls")
+    assert "retention" not in settings
+    flags, _ = profile.to_argv(settings, "ls")
+    assert "--retention" not in flags
+
+
 def test_rip_sample_yaml_validates() -> None:
     # The shipped sample must validate, otherwise it lies about the schema.
     here = Path(__file__).resolve().parents[1]

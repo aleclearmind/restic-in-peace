@@ -130,12 +130,15 @@ def resolve(config: dict[str, Any], name: str, command: str) -> tuple[dict[str, 
         for key, value in profile.items():
             if key == "inherit":
                 continue
-            if isinstance(value, dict) and key == "env":
-                merged.setdefault("env", {}).update(value)
-            elif isinstance(value, dict) and key in COMMAND_SECTIONS:
-                merged.setdefault(key, {}).update(value)
-            else:
-                merged[key] = value
+            if isinstance(value, dict):
+                if key == "env":
+                    merged.setdefault("env", {}).update(value)
+                elif key in COMMAND_SECTIONS:
+                    merged.setdefault(key, {}).update(value)
+                # else: stray sub-section (e.g. resticprofile's `retention:`);
+                # drop it — translating a dict to a restic flag is never right.
+                continue
+            merged[key] = value
 
     command_settings = merged.pop(command, {})
     for section in COMMAND_SECTIONS:
