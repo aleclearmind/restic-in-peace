@@ -7,8 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import IO
 
-import yaml
-
 from . import profile as profile_mod
 from .utils import logger
 
@@ -45,11 +43,8 @@ def run(config_path: str) -> int:
     config_path = os.path.abspath(config_path)
     try:
         config = profile_mod.load_config(config_path)
-    except FileNotFoundError:
-        logger.error(f"Config file not found: {config_path}")
-        return 1
-    except yaml.YAMLError as e:
-        logger.error(f"Could not parse {config_path} as YAML: {e}")
+    except profile_mod.ConfigError as e:
+        logger.error(str(e))
         return 1
 
     try:

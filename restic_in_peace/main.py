@@ -435,7 +435,7 @@ def entrypoint() -> None:
         try:
             config = profile_mod.load_config(config_path)
             settings, env = profile_mod.resolve(config, profile_name, argv[0])
-        except (KeyError, ValueError, FileNotFoundError) as e:
+        except (KeyError, ValueError, profile_mod.ConfigError) as e:
             sys.stderr.write(f"{e}\n")
             sys.exit(1)
 

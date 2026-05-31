@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import jsonschema
 import yaml
 
 
@@ -20,9 +21,83 @@ COMMAND_SECTIONS = frozenset({
 })
 
 
+CONFIG_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "profiles": {
+            "type": "object",
+            "additionalProperties": {"$ref": "#/$defs/profile"},
+        },
+        "fix-homes": {
+            "type": "object",
+            "additionalProperties": {"$ref": "#/$defs/fixHomeUser"},
+        },
+        "run-backup": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["log-path"],
+            "properties": {
+                "log-path": {"type": "string"},
+            },
+        },
+    },
+    "$defs": {
+        "profile": {
+            "type": "object",
+            # restic flags and command sub-sections (backup, forget, ...) vary
+            # too much to enumerate; only the rip-specific knobs are typed.
+            "additionalProperties": True,
+            "properties": {
+                "inherit": {"type": "string"},
+                "repository": {"type": "string"},
+                "env": {
+                    "type": "object",
+                    "additionalProperties": {"type": ["string", "number", "boolean"]},
+                },
+                "added-size-limit": {"type": ["string", "integer"]},
+                "skip-on-battery": {"type": "boolean"},
+                "wifi-whitelist": {"type": "array", "items": {"type": "string"}},
+                "wifi-blacklist": {"type": "array", "items": {"type": "string"}},
+                "monitor-url": {"type": "array", "items": {"type": "string"}},
+                "desktop-notifications": {"type": "boolean"},
+                "tee-restic-logs": {"type": "string"},
+            },
+        },
+        "fixHomeUser": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        },
+    },
+}
+
+_validator = jsonschema.Draft202012Validator(CONFIG_SCHEMA)
+
+
+class ConfigError(Exception):
+    pass
+
+
 def load_config(path: str) -> dict[str, Any]:
-    with open(path) as f:
-        return yaml.safe_load(f) or {}
+    try:
+        with open(path) as f:
+            config = yaml.safe_load(f) or {}
+    except FileNotFoundError as e:
+        raise ConfigError(f"Config file not found: {path}") from e
+    except yaml.YAMLError as e:
+        raise ConfigError(f"Could not parse {path} as YAML: {e}") from e
+
+    try:
+        _validator.validate(config)
+    except jsonschema.ValidationError as e:
+        location = "/".join(str(p) for p in e.absolute_path) or "<root>"
+        raise ConfigError(f"{path}: schema error at {location}: {e.message}") from e
+
+    return config
 
 
 def children_of(config: dict[str, Any], parent: str) -> list[str]:

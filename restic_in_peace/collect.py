@@ -93,7 +93,11 @@ def run(config_path: str, output_dir: str) -> int:
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    config = profile_mod.load_config(config_path)
+    try:
+        config = profile_mod.load_config(config_path)
+    except profile_mod.ConfigError as e:
+        logger.error(str(e))
+        return 1
     profiles = profile_mod.children_of(config, "common")
 
     backed_up: set[str] = set()

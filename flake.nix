@@ -23,6 +23,7 @@
             requests
             notify2
             pyyaml
+            jsonschema
           ];
 
           # restic-in-peace shells out to restic; make sure it's on PATH.
@@ -61,6 +62,7 @@
               requests
               notify2
               pyyaml
+              jsonschema
               setuptools
               pytest
               mypy
@@ -75,7 +77,7 @@
             restic-in-peace
             pkgs.restic
             (python.withPackages (ps: with ps; [
-              pytest pyyaml mypy types-pyyaml types-requests loguru requests notify2
+              pytest pyyaml jsonschema mypy types-pyyaml types-requests loguru requests notify2
             ]))
           ];
         } ''

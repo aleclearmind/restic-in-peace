@@ -2,3 +2,4 @@ loguru
 requests
 notify2
 pyyaml
+jsonschema

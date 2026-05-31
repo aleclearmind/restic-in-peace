@@ -4,8 +4,6 @@ import os
 import sys
 from pathlib import Path
 
-import yaml
-
 from . import profile as profile_mod
 
 
@@ -27,11 +25,8 @@ def run(config_path: str, strict: bool = False) -> int:
 
     try:
         config = profile_mod.load_config(config_path)
-    except FileNotFoundError:
-        log(f"Config file not found: {config_path}")
-        return 1
-    except yaml.YAMLError as e:
-        log(f"Could not parse {config_path} as YAML: {e}")
+    except profile_mod.ConfigError as e:
+        log(str(e))
         return 1
 
     try:
