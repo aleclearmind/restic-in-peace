@@ -31,13 +31,14 @@ rip-specific subcommands (anything else is passed to restic; refer to `man resti
   fix-home [--strict] <config>
       Emit a bash script that links the dotfiles declared in fix-homes/$USER.
       --strict makes it exit non-zero if any link/move would be needed.
-  run-backup [--dry-run] <config>
+  run-backup [--dry-run] [--log-path DIR] <config>
       For each profile inheriting from `common`, run (in order):
       restic-in-peace fix-home --strict, unlock, backup,
       forget (only if the profile defines a `forget:` section), check.
       With --dry-run: skip unlock and check, and pass --dry-run to
       backup and forget so restic simulates. rip's own size-limit /
       battery / network gates still apply.
+      --log-path overrides run-backup.log-path from the config.
   collect-non-backuped-files <config> <output-dir>
       Walk the filesystem, run a dry-run backup of every common-inheriting
       profile, and list files present on disk that none of the profiles
@@ -68,6 +69,11 @@ argparser.add_argument(
     "--dry-run", action="store_true", dest="dry_run",
     help="for backup/forget: pass --dry-run to restic; "
     "for run-backup: skip unlock+check and pass --dry-run to backup+forget",
+)
+argparser.add_argument(
+    "--log-path", dest="log_path", metavar="DIR",
+    help="for run-backup: directory where the dated <run> subdir goes "
+    "(overrides run-backup.log-path in the config)",
 )
 
 # These options are specific of this tool and must not be passed to restic
@@ -320,7 +326,7 @@ def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
         if not unparsed_args:
             logger.error("run-backup requires a config path argument")
             exit(1)
-        exit(run_backup_run(unparsed_args[0], dry_run=args.dry_run))
+        exit(run_backup_run(unparsed_args[0], dry_run=args.dry_run, log_path=args.log_path))
 
     if args.command == "collect-non-backuped-files":
         from .collect import run as collect_run

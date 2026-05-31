@@ -119,6 +119,37 @@ def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
 
 
+def test_log_path_cli_overrides_config(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    (fake_home / "doc.txt").write_text("hi\n")
+    # Config has no log-path; the CLI flag supplies one.
+    config = write_config({
+        "profiles": {
+            "common": {
+                "repository": str(restic_repo),
+                "env": {"RESTIC_PASSWORD": restic_password},
+            },
+            "p1": {
+                "inherit": "common",
+                "backup": {"source": [str(fake_home)]},
+            },
+        },
+    })
+    log_dir = tmp_path / "via-cli"
+
+    result = subprocess.run(
+        [rip_bin, "run-backup", "--log-path", str(log_dir), str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    runs = sorted(log_dir.iterdir())
+    assert len(runs) == 1
+    assert (runs[0] / "backup.log").exists()
+    assert (runs[0] / "p1.ncdu.json").exists()
+
+
 def test_falls_back_to_stderr_when_log_path_missing(
     fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):

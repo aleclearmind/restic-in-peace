@@ -41,7 +41,7 @@ def _run_fix_home(config_path: str, sinks: list[IO[str]], sudo_user: str | None 
     return _stream(cmd, sinks)
 
 
-def run(config_path: str, dry_run: bool = False) -> int:
+def run(config_path: str, dry_run: bool = False, log_path: str | None = None) -> int:
     config_path = os.path.abspath(config_path)
     try:
         config = profile_mod.load_config(config_path)
@@ -49,7 +49,7 @@ def run(config_path: str, dry_run: bool = False) -> int:
         logger.error(str(e))
         return 1
 
-    log_dir_str = config.get("run-backup", {}).get("log-path")
+    log_dir_str = log_path or config.get("run-backup", {}).get("log-path")
     fix_homes_users = list(config.get("fix-homes", {}).keys())
     profiles = profile_mod.children_of(config, "common")
     current_user = os.environ.get("USER") or os.environ.get("LOGNAME")
