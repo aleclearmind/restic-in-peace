@@ -4,8 +4,6 @@ import re
 import subprocess
 from pathlib import Path
 
-import yaml
-
 from . import profile as profile_mod
 from .utils import logger
 
@@ -16,14 +14,6 @@ SYSTEM_DIRS = frozenset({
     "/nix", "/sys", "/proc", "/dev", "/bin", "/usr",
     "/tmp", "/lib", "/lib64", "/mnt", "/run",
 })
-
-
-def _profiles_inheriting(config, parent):
-    profiles = config.get("profiles", {})
-    return sorted(
-        name for name, settings in profiles.items()
-        if isinstance(settings, dict) and settings.get("inherit") == parent
-    )
 
 
 def _restic_command(config, name, command, extra_args=()):
@@ -48,12 +38,8 @@ def _walk_roots():
 def _collect_files(roots):
     all_files = set()
     for root in roots:
-        for path in root.rglob("*"):
-            try:
-                if path.is_file():
-                    all_files.add(str(path))
-            except OSError:
-                continue
+        for dirpath, _, filenames in os.walk(str(root), onerror=lambda e: None):
+            all_files.update(os.path.join(dirpath, f) for f in filenames)
     return all_files
 
 
@@ -81,9 +67,13 @@ def _build_filter(config, profiles, all_files):
 
     parts = [e for e in excludes if e not in sources]
 
-    for marker in markers:
-        suffix = f"/{marker}"
-        parts.extend(sorted({f[: -len(suffix)] for f in all_files if f.endswith(suffix)}))
+    if markers:
+        marker_dirs = set()
+        for f in all_files:
+            parent, name = os.path.split(f)
+            if name in markers:
+                marker_dirs.add(parent)
+        parts.extend(sorted(marker_dirs))
 
     if not parts:
         return None
@@ -95,10 +85,8 @@ def run(config_path, output_dir):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(config_path) as f:
-        config = yaml.safe_load(f) or {}
-
-    profiles = _profiles_inheriting(config, "common")
+    config = profile_mod.load_config(config_path)
+    profiles = profile_mod.children_of(config, "common")
 
     backed_up = set()
     log_files = []

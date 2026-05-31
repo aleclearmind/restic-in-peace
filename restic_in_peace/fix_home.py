@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml
 
+from . import profile as profile_mod
+
 
 def log(message):
     sys.stderr.write(message + "\n")
@@ -22,8 +24,7 @@ def run(config_path, strict=False):
         return 1
 
     try:
-        with open(config_path) as f:
-            config = yaml.safe_load(f) or {}
+        config = profile_mod.load_config(config_path)
     except FileNotFoundError:
         log(f"Config file not found: {config_path}")
         return 1

@@ -411,33 +411,14 @@ class TooMuchDataException(Exception):
         super().__init__(message, *args)
 
 
-def _extract_profile_opts(argv):
-    """Strip --config/-c and --name/-n (and =-forms) out of argv."""
-    cleaned = []
-    config = name = None
-    i = 0
-    while i < len(argv):
-        arg = argv[i]
-        if arg in ("--config", "-c"):
-            config = argv[i + 1]
-            i += 2
-        elif arg.startswith("--config="):
-            config = arg.split("=", 1)[1]
-            i += 1
-        elif arg in ("--name", "-n"):
-            name = argv[i + 1]
-            i += 2
-        elif arg.startswith("--name="):
-            name = arg.split("=", 1)[1]
-            i += 1
-        else:
-            cleaned.append(arg)
-            i += 1
-    return cleaned, config, name
+_profile_pre_parser = argparse.ArgumentParser(add_help=False)
+_profile_pre_parser.add_argument("-c", "--config")
+_profile_pre_parser.add_argument("-n", "--name")
 
 
 def entrypoint():
-    argv, config_path, profile_name = _extract_profile_opts(sys.argv[1:])
+    pre_args, argv = _profile_pre_parser.parse_known_args(sys.argv[1:])
+    config_path, profile_name = pre_args.config, pre_args.name
 
     if config_path or profile_name:
         if not (config_path and profile_name):

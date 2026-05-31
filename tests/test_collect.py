@@ -1,15 +1,8 @@
 import subprocess
 
-import yaml
-
-
-def _write_yaml(path, config):
-    path.write_text(yaml.safe_dump(config, default_flow_style=False))
-    return path
-
 
 def test_collect_partitions_files(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, test_env
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, write_config, test_env
 ):
     backed = fake_home / "in-backup"
     backed.mkdir()
@@ -23,7 +16,7 @@ def test_collect_partitions_files(
     (cache / "CACHEDIR.TAG").write_text("Signature: 8a477f597d28d172789f06886806bc55\n")
     (cache / "blob.bin").write_text("d\n")
 
-    config_path = _write_yaml(tmp_path / "rip.yaml", {
+    config_path = write_config({
         "profiles": {
             "common": {
                 "repository": str(restic_repo),

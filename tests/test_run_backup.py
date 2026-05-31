@@ -1,11 +1,9 @@
 import subprocess
 
-import yaml
-
 from .conftest import snapshot_count
 
 
-def _make_config(path, log_dir, repo, password, source, fix_homes=None):
+def _config_dict(log_dir, repo, password, source, fix_homes=None):
     config = {
         "run-backup": {"log-path": str(log_dir)},
         "profiles": {
@@ -21,16 +19,15 @@ def _make_config(path, log_dir, repo, password, source, fix_homes=None):
     }
     if fix_homes is not None:
         config["fix-homes"] = fix_homes
-    path.write_text(yaml.safe_dump(config, default_flow_style=False))
-    return path
+    return config
 
 
 def test_orchestrates_backup(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, test_env
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):
     (fake_home / "doc.txt").write_text("hello\n")
     log_dir = tmp_path / "logs"
-    config = _make_config(tmp_path / "rip.yaml", log_dir, restic_repo, restic_password, fake_home)
+    config = write_config(_config_dict(log_dir, restic_repo, restic_password, fake_home))
 
     result = subprocess.run(
         [rip_bin, "run-backup", str(config)],
@@ -42,20 +39,18 @@ def test_orchestrates_backup(
     assert len(log_files) == 1
     log_content = log_files[0].read_text()
     assert "Backing up profile p1" in log_content
-    # check always runs after backup
     assert "no errors were found" in log_content or "check" in log_content
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
 
 
 def test_runs_forget_when_section_present(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, test_env
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):
     # Seed two pre-existing snapshots; run-backup will create a third, then
     # forget keep-last=1 should leave only the newest.
     (fake_home / "doc.txt").write_text("v1\n")
     log_dir = tmp_path / "logs"
-    config_path = tmp_path / "rip.yaml"
-    config = {
+    config_path = write_config({
         "run-backup": {"log-path": str(log_dir)},
         "profiles": {
             "common": {
@@ -68,8 +63,7 @@ def test_runs_forget_when_section_present(
                 "forget": {"keep-last": 1},
             },
         },
-    }
-    config_path.write_text(yaml.safe_dump(config, default_flow_style=False))
+    })
 
     for content in ("v1\n", "v2\n"):
         (fake_home / "doc.txt").write_text(content)
@@ -89,16 +83,16 @@ def test_runs_forget_when_section_present(
 
 
 def test_aborts_when_fix_home_strict_fails(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, test_env
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, write_config, test_env
 ):
     (fake_home / ".dotfiles").mkdir()
     (fake_home / ".vimrc").write_text("set nu\n")
 
     log_dir = tmp_path / "logs"
-    config = _make_config(
-        tmp_path / "rip.yaml", log_dir, restic_repo, restic_password, fake_home,
+    config = write_config(_config_dict(
+        log_dir, restic_repo, restic_password, fake_home,
         fix_homes={current_user: {"ignore": [".dotfiles"], ".dotfiles": [".vimrc"]}},
-    )
+    ))
 
     result = subprocess.run(
         [rip_bin, "run-backup", str(config)],
@@ -109,7 +103,7 @@ def test_aborts_when_fix_home_strict_fails(
 
 
 def test_proceeds_when_fix_home_strict_passes(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, test_env
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, write_config, test_env
 ):
     (fake_home / ".dotfiles").mkdir()
     (fake_home / ".dotfiles" / ".vimrc").write_text("set nu\n")
@@ -117,10 +111,10 @@ def test_proceeds_when_fix_home_strict_passes(
     (fake_home / "doc.txt").write_text("hello\n")
 
     log_dir = tmp_path / "logs"
-    config = _make_config(
-        tmp_path / "rip.yaml", log_dir, restic_repo, restic_password, fake_home,
+    config = write_config(_config_dict(
+        log_dir, restic_repo, restic_password, fake_home,
         fix_homes={current_user: {"ignore": [".dotfiles"], ".dotfiles": [".vimrc"]}},
-    )
+    ))
 
     result = subprocess.run(
         [rip_bin, "run-backup", str(config)],

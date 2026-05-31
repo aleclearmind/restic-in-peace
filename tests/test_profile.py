@@ -1,20 +1,13 @@
 import subprocess
 
-import yaml
-
 from .conftest import snapshot_count
 
 
-def _write_yaml(path, config):
-    path.write_text(yaml.safe_dump(config, default_flow_style=False))
-    return path
-
-
 def test_backup_via_profile_creates_snapshot(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, test_env
+    fake_home, restic_repo, restic_password, rip_bin, restic_bin, write_config, test_env
 ):
     (fake_home / "doc.txt").write_text("hello\n")
-    config = _write_yaml(tmp_path / "rip.yaml", {
+    config = write_config({
         "profiles": {
             "common": {
                 "repository": str(restic_repo),
@@ -36,11 +29,11 @@ def test_backup_via_profile_creates_snapshot(
 
 
 def test_profile_inheritance_overrides(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, test_env
+    fake_home, restic_repo, restic_password, rip_bin, restic_bin, write_config, test_env
 ):
     # `common` points at a bogus repo; `p1` overrides it with the real one.
     (fake_home / "doc.txt").write_text("hi\n")
-    config = _write_yaml(tmp_path / "rip.yaml", {
+    config = write_config({
         "profiles": {
             "common": {
                 "repository": "/nonexistent/bogus",
@@ -63,10 +56,10 @@ def test_profile_inheritance_overrides(
 
 
 def test_profile_size_limit_aborts(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, test_env
+    fake_home, restic_repo, restic_password, rip_bin, restic_bin, write_config, test_env
 ):
     (fake_home / "big.bin").write_bytes(b"x" * 10_000)
-    config = _write_yaml(tmp_path / "rip.yaml", {
+    config = write_config({
         "profiles": {
             "p1": {
                 "repository": str(restic_repo),
@@ -86,11 +79,11 @@ def test_profile_size_limit_aborts(
 
 
 def test_forget_translates_policy_flags(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, test_env
+    fake_home, restic_repo, restic_password, rip_bin, restic_bin, write_config, test_env
 ):
     # Seed two snapshots so forget --keep-last 1 has something to remove.
     (fake_home / "doc.txt").write_text("v1\n")
-    config = _write_yaml(tmp_path / "rip.yaml", {
+    config = write_config({
         "profiles": {
             "p1": {
                 "repository": str(restic_repo),
@@ -117,8 +110,8 @@ def test_forget_translates_policy_flags(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
 
 
-def test_unknown_profile_fails(tmp_path, rip_bin, test_env):
-    config = _write_yaml(tmp_path / "rip.yaml", {"profiles": {"p1": {"repository": "/x"}}})
+def test_unknown_profile_fails(rip_bin, write_config, test_env):
+    config = write_config({"profiles": {"p1": {"repository": "/x"}}})
     result = subprocess.run(
         [rip_bin, "--config", str(config), "--name", "missing", "snapshots"],
         capture_output=True, text=True, env=test_env,

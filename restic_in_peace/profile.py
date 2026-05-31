@@ -21,6 +21,15 @@ def load_config(path):
         return yaml.safe_load(f) or {}
 
 
+def children_of(config, parent):
+    """Names of profiles that directly inherit from `parent`, sorted."""
+    return sorted(
+        name
+        for name, settings in config.get("profiles", {}).items()
+        if isinstance(settings, dict) and settings.get("inherit") == parent
+    )
+
+
 def resolve(config, name, command):
     """Return (settings, env) for `command` under profile `name`, applying inheritance."""
     profiles = config.get("profiles", {})

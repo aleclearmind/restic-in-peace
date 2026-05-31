@@ -40,8 +40,7 @@ def _run_fix_home(config_path, sinks, sudo_user=None):
 def run(config_path):
     config_path = os.path.abspath(config_path)
     try:
-        with open(config_path) as f:
-            config = yaml.safe_load(f) or {}
+        config = profile_mod.load_config(config_path)
     except FileNotFoundError:
         logger.error(f"Config file not found: {config_path}")
         return 1
@@ -56,11 +55,7 @@ def run(config_path):
         return 1
 
     fix_homes_users = list(config.get("fix-homes", {}).keys())
-    profiles = sorted(
-        name
-        for name, settings in config.get("profiles", {}).items()
-        if isinstance(settings, dict) and settings.get("inherit") == "common"
-    )
+    profiles = profile_mod.children_of(config, "common")
 
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / datetime.now().strftime("%Y-%m-%d")
