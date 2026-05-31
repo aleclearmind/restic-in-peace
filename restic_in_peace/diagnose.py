@@ -11,13 +11,13 @@ from . import profile as profile_mod
 from . import version
 
 
-def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int]]:
+def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int, int]]:
     """Run `restic backup --dry-run --verbose=2 --json` for profile `name`
-    and return [(path, size), ...] for every file restic would add.
+    and return [(path, asize, dsize), ...] for every file restic would add.
 
-    File sizes come from os.path.getsize(): restic's dry-run "new" events
-    carry data_size=0 (nothing was actually added), so the JSON output is
-    only good for the path list.
+    asize is the file's apparent size (st_size); dsize is its actual disk
+    usage (st_blocks * 512). ncdu's default view is the disk-usage one, so
+    we have to provide dsize or it shows 0.0 B for everything.
     """
     settings, env = profile_mod.resolve(config, name, "backup")
     flags, positionals = profile_mod.to_argv(settings, "backup", drop_keys=profile_mod.RIP_ONLY)
@@ -34,7 +34,7 @@ def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int]]:
     # "unchanged" files (and the scan_finished event) don't.
     interesting_actions = {"new", "modified", "changed"}
 
-    items: list[tuple[str, int]] = []
+    items: list[tuple[str, int, int]] = []
     for line in result.stdout.splitlines():
         try:
             msg = json.loads(line)
@@ -48,36 +48,39 @@ def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int]]:
             # skip them (ncdu computes directory totals from contents).
             continue
         try:
-            size = os.path.getsize(item)
+            st = os.stat(item)
+            asize, dsize = st.st_size, st.st_blocks * 512
         except OSError:
-            size = 0
-        items.append((item, size))
+            asize, dsize = 0, 0
+        items.append((item, asize, dsize))
     return items
 
 
-def build_ncdu(items: list[tuple[str, int]]) -> list[Any]:
-    """Build an ncdu v1.2 JSON document from a flat list of (file_path, size).
+def build_ncdu(items: list[tuple[str, int, int]]) -> list[Any]:
+    """Build an ncdu v1.2 JSON document from a flat list of
+    (file_path, asize, dsize) tuples.
 
     ncdu format reference: https://dev.yorhel.nl/ncdu/jsonfmt
-    - A file entry is `{"name": ..., "asize": <bytes>}`.
+    - A file entry is `{"name": ..., "asize": <bytes>, "dsize": <bytes>}`.
     - A directory entry is `[{"name": ..., }, child, child, [subdir-head, ...]]`.
     - ncdu computes a directory's displayed total by summing its descendants,
-      so we deliberately leave `asize` off directory heads.
+      so we deliberately leave `asize`/`dsize` off directory heads.
     """
     root: dict[str, Any] = {}
 
-    for path, size in items:
+    for path, asize, dsize in items:
         parts = PurePosixPath(path).parts
         if not parts:
             continue
         current = root
         for i, part in enumerate(parts):
             is_last = i == len(parts) - 1
-            entry = current.setdefault(part, {"size": 0, "children": {}})
+            entry = current.setdefault(part, {"asize": 0, "dsize": 0, "children": {}})
             if is_last:
                 # Don't overwrite a directory we already saw (defensive).
                 if not entry["children"]:
-                    entry["size"] = size
+                    entry["asize"] = asize
+                    entry["dsize"] = dsize
                     entry["children"] = None
             else:
                 if entry["children"] is None:
@@ -86,7 +89,7 @@ def build_ncdu(items: list[tuple[str, int]]) -> list[Any]:
 
     def to_ncdu(name: str, entry: dict[str, Any]) -> Any:
         if entry["children"] is None:
-            return {"name": name, "asize": entry["size"]}
+            return {"name": name, "asize": entry["asize"], "dsize": entry["dsize"]}
         return [{"name": name}] + [to_ncdu(n, e) for n, e in sorted(entry["children"].items())]
 
     if len(root) == 1:
