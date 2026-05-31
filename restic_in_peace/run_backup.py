@@ -6,6 +6,7 @@ from pathlib import Path
 
 import yaml
 
+from . import profile as profile_mod
 from .utils import logger
 
 
@@ -82,7 +83,12 @@ def run(config_path):
 
         for profile in profiles:
             _tee(f"Backing up profile {profile}\n", sinks)
-            for subcommand in ("unlock", "backup"):
+            subcommands = ["unlock", "backup"]
+            if profile_mod.has_section(config, profile, "forget"):
+                subcommands.append("forget")
+            subcommands.append("check")
+
+            for subcommand in subcommands:
                 cmd = ["restic-in-peace", "--config", config_path, "--name", profile, subcommand]
                 rc = _stream(cmd, sinks)
                 if rc != 0:

@@ -85,6 +85,38 @@ def test_profile_size_limit_aborts(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
 
 
+def test_forget_translates_policy_flags(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, test_env
+):
+    # Seed two snapshots so forget --keep-last 1 has something to remove.
+    (fake_home / "doc.txt").write_text("v1\n")
+    config = _write_yaml(tmp_path / "rip.yaml", {
+        "profiles": {
+            "p1": {
+                "repository": str(restic_repo),
+                "env": {"RESTIC_PASSWORD": restic_password},
+                "backup": {"source": [str(fake_home)]},
+                "forget": {"keep-last": 1},
+            },
+        },
+    })
+
+    for content in ("v1\n", "v2\n", "v3\n"):
+        (fake_home / "doc.txt").write_text(content)
+        subprocess.run(
+            [rip_bin, "--config", str(config), "--name", "p1", "backup"],
+            capture_output=True, text=True, env=test_env, check=True,
+        )
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 3
+
+    result = subprocess.run(
+        [rip_bin, "--config", str(config), "--name", "p1", "forget"],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+
+
 def test_unknown_profile_fails(tmp_path, rip_bin, test_env):
     config = _write_yaml(tmp_path / "rip.yaml", {"profiles": {"p1": {"repository": "/x"}}})
     result = subprocess.run(

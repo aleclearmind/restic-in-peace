@@ -58,6 +58,20 @@ def resolve(config, name, command):
     return merged, env
 
 
+def has_section(config, name, section):
+    """True if profile `name` (or any ancestor) defines a non-empty `section`."""
+    profiles = config.get("profiles", {})
+    seen = set()
+    current = name
+    while current and current not in seen:
+        seen.add(current)
+        profile = profiles.get(current, {})
+        if profile.get(section):
+            return True
+        current = profile.get("inherit")
+    return False
+
+
 def to_argv(settings, command):
     """Translate `settings` (from `resolve`) to flag args and positional args."""
     settings = dict(settings)
