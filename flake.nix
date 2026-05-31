@@ -26,16 +26,9 @@
             jsonschema
           ];
 
-          # restic-in-peace shells out to restic; make sure it's on PATH.
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-
-          # Regenerate the flag-types snapshot against the exact restic this
-          # flake builds against so the strict schema matches that version.
-          preBuild = ''
-            python scripts/generate_restic_flags.py \
-              ${pkgs.restic}/bin/restic \
-              restic_in_peace/restic_flags.json
-          '';
+          # restic is needed at build time (setup.py regenerates
+          # restic_flags.json against it) and at runtime (rip shells out to it).
+          nativeBuildInputs = [ pkgs.makeWrapper pkgs.restic ];
 
           postFixup = ''
             wrapProgram $out/bin/restic-in-peace \
@@ -94,7 +87,9 @@
           mkdir -p $HOME
           cp -r ${./restic_in_peace} ./restic_in_peace
           cp -r ${./tests} ./tests
+          cp -r ${./scripts} ./scripts
           cp ${./pyproject.toml} ./pyproject.toml
+          chmod -R u+w ./restic_in_peace
           mypy
           pytest ./tests -v
           touch $out

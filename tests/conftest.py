@@ -5,11 +5,26 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable
 
 import pytest
 import yaml
+
+
+_PROJECT = Path(__file__).resolve().parents[1]
+_FLAGS_TARGET = _PROJECT / "restic_in_peace" / "restic_flags.json"
+_FLAGS_SCRIPT = _PROJECT / "scripts" / "generate_restic_flags.py"
+
+# Regenerate restic_flags.json before pytest imports restic_in_peace.profile,
+# so the strict-schema tests run against the real restic in this environment.
+_restic = os.environ.get("RESTIC_BIN") or shutil.which("restic")
+if _restic and _FLAGS_SCRIPT.exists():
+    subprocess.run(
+        [sys.executable, str(_FLAGS_SCRIPT), _restic, str(_FLAGS_TARGET)],
+        check=True,
+    )
 
 
 def _which(name: str, env_var: str) -> str:
