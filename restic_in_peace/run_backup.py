@@ -82,10 +82,10 @@ def run(config_path):
         for profile in profiles:
             _tee(f"Backing up profile {profile}\n", sinks)
             for subcommand in ("unlock", "backup"):
-                cmd = ["resticprofile", "-c", config_path, "--name", profile, subcommand]
+                cmd = ["restic-in-peace", "--config", config_path, "--name", profile, subcommand]
                 rc = _stream(cmd, sinks)
                 if rc != 0:
-                    _tee(f"resticprofile {subcommand} for {profile} exited with {rc}\n", sinks)
+                    _tee(f"{subcommand} for {profile} exited with {rc}\n", sinks)
                     return rc
 
     return 0

@@ -22,8 +22,8 @@ def _make_config(path, log_dir, repo, password_file, source, fix_homes=None):
     return path
 
 
-def test_orchestrates_backup_via_resticprofile(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, resticprofile_bin, test_env
+def test_orchestrates_backup(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, test_env
 ):
     (fake_home / "doc.txt").write_text("hello\n")
     log_dir = tmp_path / "logs"
@@ -42,7 +42,7 @@ def test_orchestrates_backup_via_resticprofile(
 
 
 def test_aborts_when_fix_home_strict_fails(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, resticprofile_bin, current_user, test_env
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, test_env
 ):
     (fake_home / ".dotfiles").mkdir()
     (fake_home / ".vimrc").write_text("set nu\n")
@@ -62,7 +62,7 @@ def test_aborts_when_fix_home_strict_fails(
 
 
 def test_proceeds_when_fix_home_strict_passes(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, resticprofile_bin, current_user, test_env
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, test_env
 ):
     (fake_home / ".dotfiles").mkdir()
     (fake_home / ".dotfiles" / ".vimrc").write_text("set nu\n")

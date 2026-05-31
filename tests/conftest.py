@@ -21,11 +21,6 @@ def restic_bin():
 
 
 @pytest.fixture(scope="session")
-def resticprofile_bin():
-    return _which("resticprofile", "RESTICPROFILE_BIN")
-
-
-@pytest.fixture(scope="session")
 def rip_bin():
     return _which("restic-in-peace", "RIP_BIN")
 
@@ -61,10 +56,11 @@ def restic_repo(tmp_path, restic_bin, restic_password):
 
 
 @pytest.fixture
-def test_env(rip_bin, fake_home):
-    """Subprocess env with HOME pointed at fake_home and rip's bin dir on PATH."""
+def test_env(rip_bin, fake_home, current_user):
+    """Subprocess env with HOME, USER, and PATH ready for invoking rip."""
     env = os.environ.copy()
     env["HOME"] = str(fake_home)
+    env["USER"] = current_user
     env["PATH"] = os.path.dirname(rip_bin) + ":" + env.get("PATH", "")
     return env
 

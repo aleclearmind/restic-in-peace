@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import signal
 import subprocess
 import sys
@@ -403,7 +404,58 @@ class TooMuchDataException(Exception):
         super().__init__(message, *args)
 
 
+def _extract_profile_opts(argv):
+    """Strip --config/-c and --name/-n (and =-forms) out of argv."""
+    cleaned = []
+    config = name = None
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in ("--config", "-c"):
+            config = argv[i + 1]
+            i += 2
+        elif arg.startswith("--config="):
+            config = arg.split("=", 1)[1]
+            i += 1
+        elif arg in ("--name", "-n"):
+            name = argv[i + 1]
+            i += 2
+        elif arg.startswith("--name="):
+            name = arg.split("=", 1)[1]
+            i += 1
+        else:
+            cleaned.append(arg)
+            i += 1
+    return cleaned, config, name
+
+
 def entrypoint():
-    arguments, remaining = argparser.parse_known_args()
+    argv, config_path, profile_name = _extract_profile_opts(sys.argv[1:])
+
+    if config_path or profile_name:
+        if not (config_path and profile_name):
+            sys.stderr.write("--config and --name must be supplied together\n")
+            sys.exit(2)
+        if not argv:
+            sys.stderr.write("--config/--name require a command\n")
+            sys.exit(2)
+
+        from . import profile as profile_mod
+        try:
+            config = profile_mod.load_config(config_path)
+            settings, env = profile_mod.resolve(config, profile_name, argv[0])
+        except (KeyError, ValueError, FileNotFoundError) as e:
+            sys.stderr.write(f"{e}\n")
+            sys.exit(1)
+
+        flags, positionals = profile_mod.to_argv(settings, argv[0])
+        for k, v in env.items():
+            os.environ.setdefault(k, str(v))
+
+        # Profile flags first, then any CLI flags (so the CLI overrides for
+        # non-list args), then positional sources at the end.
+        argv = [argv[0]] + flags + argv[1:] + positionals
+
+    arguments, remaining = argparser.parse_known_args(argv)
     utils.logging.set_level(arguments.loglevel)
     main(arguments, remaining)
