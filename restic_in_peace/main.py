@@ -24,9 +24,39 @@ return_codes: dict[str, int] = {
 
 # WARN: boolean arguments must have action store_true, otherwise build_restic_command result will be incorrect
 argparser = argparse.ArgumentParser(
-    description=description, epilog="Other arguments will get passed to restic as-is, refer to the manual"
+    prog="restic-in-peace",
+    description=description,
+    epilog="""\
+rip-specific subcommands (anything else is passed to restic; refer to `man restic`):
+  fix-home [--strict] <config>
+      Emit a bash script that links the dotfiles declared in fix-homes/$USER.
+      --strict makes it exit non-zero if any link/move would be needed.
+  run-backup <config>
+      For each profile inheriting from `common`, run (in order):
+      restic-in-peace fix-home --strict, unlock, backup,
+      forget (only if the profile defines a `forget:` section), check.
+  collect-non-backuped-files <config> <output-dir>
+      Walk the filesystem, run a dry-run backup of every common-inheriting
+      profile, and list files present on disk that none of the profiles
+      would back up.
+
+profile-driven invocation:
+  restic-in-peace --config <FILE> --name <PROFILE> <command> [args...]
+  Loads <PROFILE> from <FILE>, translates settings to flags, then runs
+  <command> with those flags (and any CLI flags you pass, which override).
+""",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
 )
-argparser.add_argument("command", help="Restic command")
+argparser.add_argument("command", help="restic command or rip subcommand (see below)")
+
+# --config/--name/--strict are intercepted before argparser runs, but listed
+# here so they appear in --help.
+argparser.add_argument("-c", "--config", metavar="FILE", help="path to rip.yaml (use with --name)")
+argparser.add_argument("-n", "--name", metavar="PROFILE", help="profile name within --config")
+argparser.add_argument(
+    "--strict", action="store_true",
+    help="for fix-home: fail if any action would be needed (no bash emitted)",
+)
 
 # These options are specific of this tool and must not be passed to restic
 argparser.add_argument(
@@ -270,12 +300,8 @@ def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None
 def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
     if args.command == "fix-home":
         from .fix_home import run as fix_home_run
-        fh_args = list(unparsed_args)
-        strict = "--strict" in fh_args
-        if strict:
-            fh_args.remove("--strict")
-        config_path = fh_args[0] if fh_args else "rip.yaml"
-        exit(fix_home_run(config_path, strict=strict))
+        config_path = unparsed_args[0] if unparsed_args else "rip.yaml"
+        exit(fix_home_run(config_path, strict=args.strict))
 
     if args.command == "run-backup":
         from .run_backup import run as run_backup_run
