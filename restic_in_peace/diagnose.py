@@ -28,18 +28,24 @@ def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int]]:
     proc_env.update({k: str(v) for k, v in env.items()})
     result = subprocess.run(cmd, env=proc_env, capture_output=True, text=True)
 
+    # restic emits action="new" for files that aren't in any previous
+    # snapshot and action="modified" for files whose content changed since
+    # the last snapshot. Both contribute bytes to this backup; only
+    # "unchanged" files (and the scan_finished event) don't.
+    interesting_actions = {"new", "modified", "changed"}
+
     items: list[tuple[str, int]] = []
     for line in result.stdout.splitlines():
         try:
             msg = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if msg.get("action") != "new":
+        if msg.get("action") not in interesting_actions:
             continue
         item = msg.get("item")
         if not item or item.endswith("/"):
-            # restic emits a "new" entry for each ancestor directory too;
-            # we skip them (ncdu computes directory totals from contents).
+            # restic emits a status entry for each ancestor directory too;
+            # skip them (ncdu computes directory totals from contents).
             continue
         try:
             size = os.path.getsize(item)
