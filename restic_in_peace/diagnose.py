@@ -37,7 +37,9 @@ def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int]]:
         if msg.get("action") != "new":
             continue
         item = msg.get("item")
-        if not item:
+        if not item or item.endswith("/"):
+            # restic emits a "new" entry for each ancestor directory too;
+            # we skip them (ncdu computes directory totals from contents).
             continue
         try:
             size = os.path.getsize(item)
@@ -48,7 +50,14 @@ def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int]]:
 
 
 def build_ncdu(items: list[tuple[str, int]]) -> list[Any]:
-    """Build an ncdu v1.2 JSON document from a flat list of (path, size)."""
+    """Build an ncdu v1.2 JSON document from a flat list of (file_path, size).
+
+    ncdu format reference: https://dev.yorhel.nl/ncdu/jsonfmt
+    - A file entry is `{"name": ..., "asize": <bytes>}`.
+    - A directory entry is `[{"name": ..., }, child, child, [subdir-head, ...]]`.
+    - ncdu computes a directory's displayed total by summing its descendants,
+      so we deliberately leave `asize` off directory heads.
+    """
     root: dict[str, Any] = {}
 
     for path, size in items:
@@ -58,40 +67,27 @@ def build_ncdu(items: list[tuple[str, int]]) -> list[Any]:
         current = root
         for i, part in enumerate(parts):
             is_last = i == len(parts) - 1
-            entry = current.setdefault(part, {"size": 0, "children": {} if not is_last else None})
+            entry = current.setdefault(part, {"size": 0, "children": {}})
             if is_last:
-                entry["size"] = size
-                entry["children"] = None
+                # Don't overwrite a directory we already saw (defensive).
+                if not entry["children"]:
+                    entry["size"] = size
+                    entry["children"] = None
             else:
                 if entry["children"] is None:
                     entry["children"] = {}
                 current = entry["children"]
 
-    def compute_size(entry: dict[str, Any]) -> int:
-        children = entry["children"]
-        if children is None:
-            return int(entry["size"])
-        total = sum(compute_size(child) for child in children.values())
-        entry["size"] = total
-        return total
-
-    for entry in root.values():
-        compute_size(entry)
-
     def to_ncdu(name: str, entry: dict[str, Any]) -> Any:
-        node = {"name": name, "asize": entry["size"]}
         if entry["children"] is None:
-            return node
-        return [node] + [to_ncdu(n, e) for n, e in sorted(entry["children"].items())]
+            return {"name": name, "asize": entry["size"]}
+        return [{"name": name}] + [to_ncdu(n, e) for n, e in sorted(entry["children"].items())]
 
     if len(root) == 1:
         name, entry = next(iter(root.items()))
         tree: Any = to_ncdu(name, entry)
     else:
-        synthetic_size = sum(int(e["size"]) for e in root.values())
-        tree = [{"name": "rip-diagnostic", "asize": synthetic_size}] + [
-            to_ncdu(n, e) for n, e in sorted(root.items())
-        ]
+        tree = [{"name": "rip-diagnostic"}] + [to_ncdu(n, e) for n, e in sorted(root.items())]
 
     return [
         1,

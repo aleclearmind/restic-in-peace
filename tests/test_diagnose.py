@@ -16,28 +16,50 @@ def test_build_ncdu_groups_by_directory() -> None:
     assert doc[2]["progname"] == "restic-in-peace"
 
     tree = doc[3]
-    # Root is `/`, which contains a single `home` subdir.
+    # Root is `/`, a directory: head dict (no asize) + child arrays/dicts.
     assert isinstance(tree, list)
-    assert tree[0]["name"] == "/"
-    assert tree[0]["asize"] == 1150
+    assert tree[0] == {"name": "/"}
 
     home = tree[1]
     assert isinstance(home, list)
-    assert home[0]["name"] == "home"
-    assert home[0]["asize"] == 1150
+    assert home[0] == {"name": "home"}
 
-    names = {child[0]["name"]: child[0]["asize"] for child in home[1:]}
-    assert names == {"a": 1100, "b": 50}
+    a, b = home[1], home[2]
+    assert a[0] == {"name": "a"}
+    assert b[0] == {"name": "b"}
+
+    a_files = {entry["name"]: entry["asize"] for entry in a[1:]}
+    assert a_files == {"big.bin": 1000, "small.txt": 100}
+    b_files = {entry["name"]: entry["asize"] for entry in b[1:]}
+    assert b_files == {"other.bin": 50}
 
 
 def test_build_ncdu_empty_input() -> None:
     doc = build_ncdu([])
     assert doc[0] == 1 and doc[1] == 2
-    assert doc[3] == [{"name": "rip-diagnostic", "asize": 0}]
+    assert doc[3] == [{"name": "rip-diagnostic"}]
+
+
+def test_directory_entry_appearing_after_its_children_does_not_clobber() -> None:
+    # restic's dry-run emits an entry for every ancestor directory in
+    # addition to the files. collect_items already filters out trailing
+    # slashes, but build_ncdu's own defense in depth: if a path is seen
+    # both as a leaf and as an ancestor, the directory wins (we don't
+    # discard the children).
+    doc = build_ncdu([
+        ("/home/file.txt", 100),
+        ("/home", 4096),  # would-be parent re-asserted as a leaf
+    ])
+    tree = doc[3]
+    assert tree[0] == {"name": "/"}
+    home = tree[1]
+    assert isinstance(home, list)
+    assert home[0] == {"name": "home"}
+    files = {e["name"]: e["asize"] for e in home[1:]}
+    assert files == {"file.txt": 100}
 
 
 def test_build_ncdu_emits_valid_json() -> None:
     doc = build_ncdu([("/a/b.txt", 10)])
-    # Round-trip via json to make sure the structure is serializable.
     encoded = json.dumps(doc)
     assert json.loads(encoded) == doc
