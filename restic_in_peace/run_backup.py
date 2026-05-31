@@ -39,7 +39,7 @@ def _run_fix_home(config_path: str, sinks: list[IO[str]], sudo_user: str | None 
     return _stream(cmd, sinks)
 
 
-def run(config_path: str) -> int:
+def run(config_path: str, dry_run: bool = False) -> int:
     config_path = os.path.abspath(config_path)
     try:
         config = profile_mod.load_config(config_path)
@@ -77,13 +77,19 @@ def run(config_path: str) -> int:
 
         for profile in profiles:
             _tee(f"Backing up profile {profile}\n", sinks)
-            subcommands = ["unlock", "backup"]
+            subcommands: list[str] = []
+            if not dry_run:
+                subcommands.append("unlock")
+            subcommands.append("backup")
             if profile_mod.has_section(config, profile, "forget"):
                 subcommands.append("forget")
-            subcommands.append("check")
+            if not dry_run:
+                subcommands.append("check")
 
             for subcommand in subcommands:
                 cmd = ["restic-in-peace", "--config", config_path, "--name", profile, subcommand]
+                if dry_run and subcommand in ("backup", "forget"):
+                    cmd.append("--dry-run")
                 rc = _stream(cmd, sinks)
                 if rc != 0:
                     _tee(f"{subcommand} for {profile} exited with {rc}\n", sinks)

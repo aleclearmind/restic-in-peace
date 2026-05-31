@@ -31,10 +31,13 @@ rip-specific subcommands (anything else is passed to restic; refer to `man resti
   fix-home [--strict] <config>
       Emit a bash script that links the dotfiles declared in fix-homes/$USER.
       --strict makes it exit non-zero if any link/move would be needed.
-  run-backup <config>
+  run-backup [--dry-run] <config>
       For each profile inheriting from `common`, run (in order):
       restic-in-peace fix-home --strict, unlock, backup,
       forget (only if the profile defines a `forget:` section), check.
+      With --dry-run: skip unlock and check, and pass --dry-run to
+      backup and forget so restic simulates. rip's own size-limit /
+      battery / network gates still apply.
   collect-non-backuped-files <config> <output-dir>
       Walk the filesystem, run a dry-run backup of every common-inheriting
       profile, and list files present on disk that none of the profiles
@@ -56,6 +59,11 @@ argparser.add_argument("-n", "--name", metavar="PROFILE", help="profile name wit
 argparser.add_argument(
     "--strict", action="store_true",
     help="for fix-home: fail if any action would be needed (no bash emitted)",
+)
+argparser.add_argument(
+    "--dry-run", action="store_true", dest="dry_run",
+    help="for backup/forget: pass --dry-run to restic; "
+    "for run-backup: skip unlock+check and pass --dry-run to backup+forget",
 )
 
 # These options are specific of this tool and must not be passed to restic
@@ -175,7 +183,7 @@ def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None
     backup_command = utils.build_restic_command(
         "backup",
         args,
-        additional_argparse_arguments=["tag"],
+        additional_argparse_arguments=["tag", "dry_run"],
         additional_unparsed_arguments=unparsed_args,
         force_json=True,
         force_verbose=True,
@@ -308,7 +316,7 @@ def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
         if not unparsed_args:
             logger.error("run-backup requires a config path argument")
             exit(1)
-        exit(run_backup_run(unparsed_args[0]))
+        exit(run_backup_run(unparsed_args[0], dry_run=args.dry_run))
 
     if args.command == "collect-non-backuped-files":
         from .collect import run as collect_run
@@ -380,7 +388,9 @@ def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
             args.command = "backup"
 
         restic_command = utils.build_restic_command(
-            args.command, args, additional_argparse_arguments=["tag"], additional_unparsed_arguments=unparsed_args
+            args.command, args,
+            additional_argparse_arguments=["tag", "dry_run"],
+            additional_unparsed_arguments=unparsed_args,
         )
 
         logger.info(f"About to execute {shlex.join(restic_command)}")

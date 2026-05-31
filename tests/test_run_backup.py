@@ -82,6 +82,29 @@ def test_runs_forget_when_section_present(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
 
 
+def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    (fake_home / "doc.txt").write_text("hello\n")
+    log_dir = tmp_path / "logs"
+    config = write_config(_config_dict(log_dir, restic_repo, restic_password, fake_home))
+
+    result = subprocess.run(
+        [rip_bin, "run-backup", "--dry-run", str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+    log_content = (next(iter(log_dir.iterdir()))).read_text()
+    # backup ran (with --dry-run), unlock and check skipped.
+    assert "Backing up profile p1" in log_content
+    assert "restic backup" in log_content and "--dry-run" in log_content
+    assert "restic unlock" not in log_content
+    assert "restic check" not in log_content
+    # And no snapshot was actually created.
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
+
+
 def test_aborts_when_fix_home_strict_fails(
     fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, write_config, test_env
 ):
