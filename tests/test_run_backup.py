@@ -177,9 +177,10 @@ def test_falls_back_to_stderr_when_log_path_missing(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
 
 
-def test_aborts_when_fix_home_strict_fails(
+def test_continues_after_fix_home_strict_fails(
     fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, write_config, test_env
 ):
+    # fix-home is in a state that --strict will report as needing action.
     (fake_home / ".dotfiles").mkdir()
     (fake_home / ".vimrc").write_text("set nu\n")
 
@@ -193,8 +194,64 @@ def test_aborts_when_fix_home_strict_fails(
         [rip_bin, "run-backup", str(config)],
         capture_output=True, text=True, env=test_env,
     )
+    # Overall exit is non-zero because fix-home reported a failure...
     assert result.returncode != 0
-    assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
+    # ...but the backup still ran (continue-on-failure) and produced a snapshot.
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+
+    run_dir = next(iter(log_dir.iterdir()))
+    log = (run_dir / "backup.log").read_text()
+    assert "=== Summary ===" in log
+    assert f"fix-home/{current_user}" in log and "failed" in log
+    assert "p1" in log and "OK" in log
+
+
+def test_continues_after_one_profile_fails(
+    fake_home, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    # One profile points at a bogus repo (the backup subcommand will fail);
+    # the other points at a working repo and must still produce a snapshot.
+    import os as _os
+    good_repo = tmp_path / "good-repo"
+    _os.makedirs(good_repo)
+    subprocess.run(
+        [restic_bin, "init", "--repo", str(good_repo)],
+        env={**_os.environ, "RESTIC_PASSWORD": restic_password},
+        check=True, capture_output=True,
+    )
+    (fake_home / "doc.txt").write_text("hi\n")
+    log_dir = tmp_path / "logs"
+    config = write_config({
+        "run-backup": {"log-path": str(log_dir)},
+        "profiles": {
+            "common": {
+                "env": {"RESTIC_PASSWORD": restic_password},
+            },
+            "bad": {
+                "inherit": "common",
+                "repository": "/nonexistent/bogus",
+                "backup": {"source": [str(fake_home)]},
+            },
+            "good": {
+                "inherit": "common",
+                "repository": str(good_repo),
+                "backup": {"source": [str(fake_home)]},
+            },
+        },
+    })
+
+    result = subprocess.run(
+        [rip_bin, "run-backup", str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode != 0  # because `bad` failed
+    assert snapshot_count(restic_bin, good_repo, restic_password) == 1
+
+    run_dir = next(iter(log_dir.iterdir()))
+    log = (run_dir / "backup.log").read_text()
+    assert "=== Summary ===" in log
+    assert "bad" in log and "failed" in log
+    assert "good" in log and "OK" in log
 
 
 def test_proceeds_when_fix_home_strict_passes(

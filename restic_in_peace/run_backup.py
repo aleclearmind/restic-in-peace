@@ -69,6 +69,8 @@ def run(config_path: str, dry_run: bool = False, log_path: str | None = None) ->
 
         _tee(f"Starting backup on {datetime.now().ctime()}\n", sinks)
 
+        results: list[tuple[str, str]] = []
+
         for fix_user in fix_homes_users:
             _tee(f"Running fix-home for {fix_user}\n", sinks)
             rc = _run_fix_home(
@@ -78,7 +80,9 @@ def run(config_path: str, dry_run: bool = False, log_path: str | None = None) ->
             )
             if rc != 0:
                 _tee(f"fix-home for {fix_user} exited with {rc}\n", sinks)
-                return rc
+                results.append((f"fix-home/{fix_user}", f"failed (exit {rc})"))
+            else:
+                results.append((f"fix-home/{fix_user}", "OK"))
 
         for profile in profiles:
             _tee(f"Backing up profile {profile}\n", sinks)
@@ -103,6 +107,7 @@ def run(config_path: str, dry_run: bool = False, log_path: str | None = None) ->
             if not dry_run:
                 subcommands.append("check")
 
+            profile_failure: tuple[str, int] | None = None
             for subcommand in subcommands:
                 cmd = ["restic-in-peace", "--config", config_path, "--name", profile, subcommand]
                 if dry_run and subcommand in ("backup", "forget"):
@@ -110,6 +115,22 @@ def run(config_path: str, dry_run: bool = False, log_path: str | None = None) ->
                 rc = _stream(cmd, sinks)
                 if rc != 0:
                     _tee(f"{subcommand} for {profile} exited with {rc}\n", sinks)
-                    return rc
+                    profile_failure = (subcommand, rc)
+                    break  # skip remaining subcommands for this profile
 
+            if profile_failure is None:
+                results.append((profile, "OK"))
+            else:
+                sub, rc = profile_failure
+                results.append((profile, f"{sub} failed (exit {rc})"))
+
+        _tee("\n=== Summary ===\n", sinks)
+        width = max((len(name) for name, _ in results), default=0)
+        for name, status in results:
+            _tee(f"  {name:<{width}}  {status}\n", sinks)
+
+        failures = sum(1 for _, status in results if status != "OK")
+        if failures:
+            _tee(f"run-backup completed with {failures} failure(s)\n", sinks)
+            return 1
     return 0
