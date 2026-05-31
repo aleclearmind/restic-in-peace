@@ -90,8 +90,8 @@ _run_backup.add_argument("--dry-run", action="store_true", dest="dry_run",
     help="skip unlock and check, pass --dry-run to backup and forget")
 _run_backup.add_argument("--log-path", dest="log_path", metavar="DIR",
     help="directory where the dated <run> subdir goes (overrides run-backup.log-path)")
-_run_backup.add_argument("--only", action="append", default=[], metavar="TAG",
-    help="only back up profiles whose backup.tag matches; can be repeated")
+_run_backup.add_argument("--only", action="append", default=[], metavar="PROFILE",
+    help="only back up profiles with these names; can be repeated")
 _run_backup.add_argument("config", help="config file")
 
 # `collect-non-backuped-files`

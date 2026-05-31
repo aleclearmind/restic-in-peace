@@ -41,24 +41,6 @@ def _run_fix_home(config_path: str, sinks: list[IO[str]], sudo_user: str | None 
     return _stream(cmd, sinks)
 
 
-def _filter_by_tags(config: dict, profiles: list[str], only: list[str]) -> list[str]:
-    """Keep profiles whose resolved backup.tag matches any of `only`."""
-    wanted = set(only)
-    kept: list[str] = []
-    for profile in profiles:
-        settings, _ = profile_mod.resolve(config, profile, "backup")
-        tag = settings.get("tag")
-        if isinstance(tag, str):
-            tags = {tag}
-        elif isinstance(tag, list):
-            tags = set(tag)
-        else:
-            tags = set()
-        if tags & wanted:
-            kept.append(profile)
-    return kept
-
-
 def run(
     config_path: str,
     dry_run: bool = False,
@@ -76,7 +58,15 @@ def run(
     fix_homes_users = list(config.get("fix-homes", {}).keys())
     profiles = profile_mod.children_of(config, "common")
     if only:
-        profiles = _filter_by_tags(config, profiles, only)
+        wanted = set(only)
+        unknown = wanted - set(profiles)
+        if unknown:
+            logger.error(
+                f"--only references unknown profile(s): {sorted(unknown)}; "
+                f"available: {profiles}"
+            )
+            return 1
+        profiles = [p for p in profiles if p in wanted]
     current_user = os.environ.get("USER") or os.environ.get("LOGNAME")
 
     run_dir: Path | None = None

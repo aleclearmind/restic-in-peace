@@ -119,11 +119,11 @@ def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
 
 
-def test_only_filters_profiles_by_tag(
+def test_only_filters_profiles_by_name(
     fake_home, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):
-    # Two profiles with distinct tags, each pointing at its own repo. Only the
-    # one matching `--only` should be backed up.
+    # Two profiles, each pointing at its own repo. Only the one named in
+    # --only should be backed up.
     import os as _os
     repo_a = tmp_path / "repo-a"
     repo_b = tmp_path / "repo-b"
@@ -143,12 +143,12 @@ def test_only_filters_profiles_by_tag(
             "alpha": {
                 "inherit": "common",
                 "repository": str(repo_a),
-                "backup": {"source": [str(fake_home)], "tag": "alpha"},
+                "backup": {"source": [str(fake_home)]},
             },
             "beta": {
                 "inherit": "common",
                 "repository": str(repo_b),
-                "backup": {"source": [str(fake_home)], "tag": "beta"},
+                "backup": {"source": [str(fake_home)]},
             },
         },
     })
@@ -161,6 +161,29 @@ def test_only_filters_profiles_by_tag(
 
     assert snapshot_count(restic_bin, repo_a, restic_password) == 1
     assert snapshot_count(restic_bin, repo_b, restic_password) == 0
+
+
+def test_only_unknown_profile_fails_loudly(
+    fake_home, restic_password, tmp_path, rip_bin, write_config, test_env
+):
+    config = write_config({
+        "profiles": {
+            "common": {
+                "repository": "/x",
+                "env": {"RESTIC_PASSWORD": restic_password},
+            },
+            "alpha": {
+                "inherit": "common",
+                "backup": {"source": [str(fake_home)]},
+            },
+        },
+    })
+    result = subprocess.run(
+        [rip_bin, "run-backup", "--only", "nope", str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode != 0
+    assert "nope" in (result.stdout + result.stderr)
 
 
 def test_log_path_cli_overrides_config(
