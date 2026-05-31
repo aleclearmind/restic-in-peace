@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 
 import argparse
 import json
@@ -7,13 +8,14 @@ import signal
 import subprocess
 import sys
 import shlex
+from typing import Any
 
 from . import description
 from . import utils
 from .utils import human_numbers
 from .utils import logger
 
-return_codes = {
+return_codes: dict[str, int] = {
     "SKIP_CAUSE_BATTERY": -1,
     "SKIP_CAUSE_NETWORK": -2,
     "ABORT_TOO_MUCH_DATA": -3,
@@ -99,7 +101,7 @@ argparser.add_argument(
 )
 
 
-def get_latest_snapshot_stats(args):
+def get_latest_snapshot_stats(args: argparse.Namespace) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     get_latest_snapshot_command = utils.build_restic_command(
         "snapshots", args, additional_argparse_arguments=["tag"], force_json=True
     )
@@ -127,7 +129,7 @@ def get_latest_snapshot_stats(args):
     return latest_snapshot, snapshot_stats
 
 
-def run_backup(args, unparsed_args):
+def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None:
     latest_snapshot, latest_snapshot_stats = get_latest_snapshot_stats(args)
     if latest_snapshot is None or latest_snapshot_stats is None:
         latest_snapshot_size = 0
@@ -152,6 +154,7 @@ def run_backup(args, unparsed_args):
     logger.info(shlex.join(backup_command))
 
     process = subprocess.Popen(backup_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    assert process.stdout is not None and process.stderr is not None
 
     with utils.command.EnsureGracefulExit(process):
         scan_finished = False
@@ -264,7 +267,7 @@ def run_backup(args, unparsed_args):
         return retcode
 
 
-def main(args, unparsed_args):
+def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
     if args.command == "fix-home":
         from .fix_home import run as fix_home_run
         fh_args = list(unparsed_args)
@@ -370,9 +373,9 @@ def main(args, unparsed_args):
 
         # Send realtime restic output to stdio as well as to loguru,
         # so it can also be redirected to a file with the --tee-restic-logs option
-        stdout_wrapper = utils.logging.LoggingTextIOWrapper(sys.stdout, "RESTIC_OUT")
-        stderr_wrapper = utils.logging.LoggingTextIOWrapper(sys.stderr, "RESTIC_ERR")
-        process = subprocess.Popen(
+        stdout_wrapper = utils.logging.LoggingTextIOWrapper(sys.stdout, "RESTIC_OUT")  # type: ignore[arg-type]
+        stderr_wrapper = utils.logging.LoggingTextIOWrapper(sys.stderr, "RESTIC_ERR")  # type: ignore[arg-type]
+        process = subprocess.Popen(  # type: ignore[call-overload]
             restic_command, stdout=stdout_wrapper, stderr=stderr_wrapper, universal_newlines=True
         )
         with utils.command.EnsureGracefulExit(process):
@@ -406,7 +409,7 @@ def main(args, unparsed_args):
 
 
 class TooMuchDataException(Exception):
-    def __init__(self, message, *args: object) -> None:
+    def __init__(self, message: str, *args: object) -> None:
         self.message = message
         super().__init__(message, *args)
 
@@ -416,7 +419,7 @@ _profile_pre_parser.add_argument("-c", "--config")
 _profile_pre_parser.add_argument("-n", "--name")
 
 
-def entrypoint():
+def entrypoint() -> None:
     pre_args, argv = _profile_pre_parser.parse_known_args(sys.argv[1:])
     config_path, profile_name = pre_args.config, pre_args.name
 

@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import IO
 
 import yaml
 
@@ -10,13 +13,13 @@ from . import profile as profile_mod
 from .utils import logger
 
 
-def _tee(text, sinks):
+def _tee(text: str, sinks: list[IO[str]]) -> None:
     for sink in sinks:
         sink.write(text)
         sink.flush()
 
 
-def _stream(cmd, sinks):
+def _stream(cmd: list[str], sinks: list[IO[str]]) -> int:
     """Run `cmd`, line-streaming its merged stdout/stderr to each sink. Returns the exit code."""
     process = subprocess.Popen(
         cmd,
@@ -25,19 +28,20 @@ def _stream(cmd, sinks):
         text=True,
         bufsize=1,
     )
+    assert process.stdout is not None
     for line in process.stdout:
         _tee(line, sinks)
     return process.wait()
 
 
-def _run_fix_home(config_path, sinks, sudo_user=None):
+def _run_fix_home(config_path: str, sinks: list[IO[str]], sudo_user: str | None = None) -> int:
     """Verify that no fix-home action is pending for `sudo_user` (or the current user)."""
     prefix = ["sudo", "-Hu", sudo_user] if sudo_user else []
     cmd = prefix + ["restic-in-peace", "fix-home", "--strict", config_path]
     return _stream(cmd, sinks)
 
 
-def run(config_path):
+def run(config_path: str) -> int:
     config_path = os.path.abspath(config_path)
     try:
         config = profile_mod.load_config(config_path)

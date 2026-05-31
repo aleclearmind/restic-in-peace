@@ -1,8 +1,12 @@
+from __future__ import annotations
+
+from typing import Any
+
 import yaml
 
 
 # Config keys that map to a different restic flag name.
-KEY_ALIASES = {
+KEY_ALIASES: dict[str, str] = {
     "repository": "repo",
 }
 
@@ -16,12 +20,12 @@ COMMAND_SECTIONS = frozenset({
 })
 
 
-def load_config(path):
+def load_config(path: str) -> dict[str, Any]:
     with open(path) as f:
         return yaml.safe_load(f) or {}
 
 
-def children_of(config, parent):
+def children_of(config: dict[str, Any], parent: str) -> list[str]:
     """Names of profiles that directly inherit from `parent`, sorted."""
     return sorted(
         name
@@ -30,15 +34,15 @@ def children_of(config, parent):
     )
 
 
-def resolve(config, name, command):
+def resolve(config: dict[str, Any], name: str, command: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return (settings, env) for `command` under profile `name`, applying inheritance."""
     profiles = config.get("profiles", {})
     if name not in profiles:
         raise KeyError(f"Profile {name!r} not found")
 
-    chain = []
-    seen = set()
-    current = name
+    chain: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    current: str | None = name
     while current:
         if current in seen:
             raise ValueError(f"Inheritance cycle involving {current!r}")
@@ -46,7 +50,7 @@ def resolve(config, name, command):
         chain.append(profiles[current])
         current = chain[-1].get("inherit")
 
-    merged = {}
+    merged: dict[str, Any] = {}
     for profile in reversed(chain):
         for key, value in profile.items():
             if key == "inherit":
@@ -67,11 +71,11 @@ def resolve(config, name, command):
     return merged, env
 
 
-def has_section(config, name, section):
+def has_section(config: dict[str, Any], name: str, section: str) -> bool:
     """True if profile `name` (or any ancestor) defines a non-empty `section`."""
     profiles = config.get("profiles", {})
-    seen = set()
-    current = name
+    seen: set[str] = set()
+    current: str | None = name
     while current and current not in seen:
         seen.add(current)
         profile = profiles.get(current, {})
@@ -89,14 +93,18 @@ RIP_ONLY = frozenset({
 })
 
 
-def to_argv(settings, command, drop_keys=frozenset()):
+def to_argv(
+    settings: dict[str, Any],
+    command: str,
+    drop_keys: frozenset[str] = frozenset(),
+) -> tuple[list[str], list[str]]:
     """Translate `settings` (from `resolve`) to flag args and positional args."""
     settings = {k: v for k, v in settings.items() if k not in drop_keys}
     sources = settings.pop("source", []) if command == "backup" else []
     if isinstance(sources, str):
         sources = [sources]
 
-    flags = []
+    flags: list[str] = []
     for key, value in settings.items():
         flag = "--" + KEY_ALIASES.get(key, key)
         if isinstance(value, bool):

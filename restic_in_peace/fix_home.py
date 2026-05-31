@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
@@ -7,17 +9,17 @@ import yaml
 from . import profile as profile_mod
 
 
-def log(message):
+def log(message: str) -> None:
     sys.stderr.write(message + "\n")
     sys.stderr.flush()
 
 
-def emit(message):
+def emit(message: str) -> None:
     sys.stdout.write(message + "\n")
     sys.stdout.flush()
 
 
-def run(config_path, strict=False):
+def run(config_path: str, strict: bool = False) -> int:
     user = os.environ.get("USER") or os.environ.get("LOGNAME")
     if not user:
         log("Could not determine current user (USER/LOGNAME unset)")
@@ -40,7 +42,7 @@ def run(config_path, strict=False):
 
     home = Path.home()
 
-    dot_files = set()
+    dot_files: set[Path] = set()
 
     if not strict:
         print("#!/usr/bin/env bash")

@@ -1,0 +1,11 @@
+[tool.mypy]
+python_version = "3.10"
+files = ["restic_in_peace", "tests"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["notify2", "loguru.*", "yaml"]
+ignore_missing_imports = true

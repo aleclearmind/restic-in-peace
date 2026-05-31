@@ -1,15 +1,18 @@
+from __future__ import annotations
+
 import getpass
 import json
 import os
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any, Callable
 
 import pytest
 import yaml
 
 
-def _which(name, env_var):
+def _which(name: str, env_var: str) -> str:
     path = os.environ.get(env_var) or shutil.which(name)
     if not path:
         pytest.skip(f"{name!r} not on PATH and {env_var} not set")
@@ -17,34 +20,34 @@ def _which(name, env_var):
 
 
 @pytest.fixture(scope="session")
-def restic_bin():
+def restic_bin() -> str:
     return _which("restic", "RESTIC_BIN")
 
 
 @pytest.fixture(scope="session")
-def rip_bin():
+def rip_bin() -> str:
     return _which("restic-in-peace", "RIP_BIN")
 
 
 @pytest.fixture(scope="session")
-def current_user():
+def current_user() -> str:
     return os.environ.get("USER") or os.environ.get("LOGNAME") or getpass.getuser()
 
 
 @pytest.fixture
-def fake_home(tmp_path):
+def fake_home(tmp_path: Path) -> Path:
     home = tmp_path / "home"
     home.mkdir()
     return home
 
 
 @pytest.fixture
-def restic_password():
+def restic_password() -> str:
     return "test-password"
 
 
 @pytest.fixture
-def restic_repo(tmp_path, restic_bin, restic_password):
+def restic_repo(tmp_path: Path, restic_bin: str, restic_password: str) -> Path:
     repo = tmp_path / "repo"
     env = {**os.environ, "RESTIC_PASSWORD": restic_password}
     subprocess.run(
@@ -57,7 +60,7 @@ def restic_repo(tmp_path, restic_bin, restic_password):
 
 
 @pytest.fixture
-def test_env(rip_bin, fake_home, current_user):
+def test_env(rip_bin: str, fake_home: Path, current_user: str) -> dict[str, str]:
     """Subprocess env with HOME, USER, and PATH ready for invoking rip.
 
     Intentionally does NOT set RESTIC_PASSWORD; profile-driven tests rely on
@@ -73,13 +76,13 @@ def test_env(rip_bin, fake_home, current_user):
 
 
 @pytest.fixture
-def test_env_with_password(test_env, restic_password):
+def test_env_with_password(test_env: dict[str, str], restic_password: str) -> dict[str, str]:
     return {**test_env, "RESTIC_PASSWORD": restic_password}
 
 
 @pytest.fixture
-def write_config(tmp_path):
-    def _write(config):
+def write_config(tmp_path: Path) -> Callable[[dict[str, Any]], Path]:
+    def _write(config: dict[str, Any]) -> Path:
         path = tmp_path / "rip.yaml"
         path.write_text(yaml.safe_dump(config, default_flow_style=False))
         return path
@@ -87,7 +90,7 @@ def write_config(tmp_path):
     return _write
 
 
-def snapshot_count(restic_bin, repo, password):
+def snapshot_count(restic_bin: str, repo: Path, password: str) -> int:
     env = {**os.environ, "RESTIC_PASSWORD": password}
     result = subprocess.run(
         [restic_bin, "snapshots", "-r", str(repo), "--json"],

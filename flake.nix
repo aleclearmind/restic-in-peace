@@ -63,6 +63,9 @@
               pyyaml
               setuptools
               pytest
+              mypy
+              types-pyyaml
+              types-requests
             ]))
           ];
         };
@@ -71,12 +74,17 @@
           nativeBuildInputs = [
             restic-in-peace
             pkgs.restic
-            (python.withPackages (ps: [ ps.pytest ps.pyyaml ]))
+            (python.withPackages (ps: with ps; [
+              pytest pyyaml mypy types-pyyaml types-requests loguru requests notify2
+            ]))
           ];
         } ''
           export HOME=$TMPDIR/home
           mkdir -p $HOME
+          cp -r ${./restic_in_peace} ./restic_in_peace
           cp -r ${./tests} ./tests
+          cp ${./pyproject.toml} ./pyproject.toml
+          mypy
           pytest ./tests -v
           touch $out
         '';

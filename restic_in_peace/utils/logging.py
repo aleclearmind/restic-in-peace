@@ -129,7 +129,7 @@ def send_restic_errors_to_file(file, truncate=True):
     send_log_to_file(file, filter=restic_err_only_filter, truncate=truncate)
 
 
-topic_timestamps = {}
+topic_timestamps: dict[str, float] = {}
 global_filter = MinimumLevelFilter("INFO")
 restic_out_only_filter = ExactLevelFilter("RESTIC_OUT")
 restic_err_only_filter = ExactLevelFilter("RESTIC_ERR")
