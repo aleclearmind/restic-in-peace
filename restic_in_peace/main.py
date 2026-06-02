@@ -187,6 +187,12 @@ def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None
                         f"the limit is {human_numbers.to_si(args.added_size_limit)}, aborting!"
                     )
                     logger.critical(message)
+                    diag_file = os.environ.get("RIP_DIAGNOSTIC_FILE")
+                    if diag_file and os.path.exists(diag_file):
+                        logger.critical(
+                            f"To investigate, open the ncdu diagnostic and press 'a' "
+                            f"for apparent size:  ncdu -f {shlex.quote(diag_file)}"
+                        )
                     process.send_signal(signal.SIGINT)
                     process.wait(timeout=10)
                     if process.poll() is None:

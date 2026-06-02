@@ -34,3 +34,28 @@ def test_size_limit_aborts_backup(
     combined = (result.stdout + result.stderr).lower()
     assert "the limit is" in combined and "aborting" in combined
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
+
+
+def test_size_limit_message_points_at_ncdu_diagnostic(
+    fake_home, restic_repo, restic_password, rip_bin, restic_bin, tmp_path, test_env_with_password
+):
+    (fake_home / "big.bin").write_bytes(b"x" * 10_000)
+    # Simulate run-backup's env: a pre-written ncdu diagnostic the backup
+    # pipeline should point the user at on size-limit abort.
+    diag = tmp_path / "p1.ncdu.json"
+    diag.write_text("[]\n")
+    env = {**test_env_with_password, "RIP_DIAGNOSTIC_FILE": str(diag)}
+
+    result = subprocess.run(
+        [
+            rip_bin, "restic", "backup",
+            "-r", str(restic_repo),
+            "--added-size-limit", "1KB",
+            str(fake_home),
+        ],
+        capture_output=True, text=True, env=env,
+    )
+    assert result.returncode != 0
+    combined = result.stdout + result.stderr
+    assert str(diag) in combined
+    assert "ncdu -f" in combined

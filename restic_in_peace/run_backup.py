@@ -19,7 +19,7 @@ def _tee(text: str, sinks: list[IO[str]]) -> None:
         sink.flush()
 
 
-def _stream(cmd: list[str], sinks: list[IO[str]]) -> int:
+def _stream(cmd: list[str], sinks: list[IO[str]], env: dict[str, str] | None = None) -> int:
     """Run `cmd`, line-streaming its merged stdout/stderr to each sink. Returns the exit code."""
     process = subprocess.Popen(
         cmd,
@@ -27,6 +27,7 @@ def _stream(cmd: list[str], sinks: list[IO[str]]) -> int:
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        env=env,
     )
     assert process.stdout is not None
     for line in process.stdout:
@@ -105,6 +106,7 @@ def run(
             # Always write a per-profile ncdu diagnostic of what restic would
             # add, before the real backup. Useful regardless of outcome (real
             # run or --dry-run, success or size-limit abort).
+            diag_path: Path | None = None
             if run_dir is not None:
                 diag_path = run_dir / f"{profile}.ncdu.json"
                 _tee(f"Writing diagnostic to {diag_path}\n", sinks)
@@ -128,7 +130,10 @@ def run(
                 cmd = ["restic-in-peace", "--config", config_path, "--name", profile, "restic", subcommand]
                 if dry_run and subcommand in ("backup", "forget"):
                     cmd.append("--dry-run")
-                rc = _stream(cmd, sinks)
+                sub_env: dict[str, str] | None = None
+                if subcommand == "backup" and diag_path is not None:
+                    sub_env = {**os.environ, "RIP_DIAGNOSTIC_FILE": str(diag_path)}
+                rc = _stream(cmd, sinks, env=sub_env)
                 if rc != 0:
                     _tee(f"{subcommand} for {profile} exited with {rc}\n", sinks)
                     profile_failure = (subcommand, rc)
