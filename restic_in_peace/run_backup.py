@@ -35,6 +35,13 @@ def _stream(cmd: list[str], sinks: list[IO[str]], env: dict[str, str] | None = N
     return process.wait()
 
 
+def _print_summary(sinks: list[IO[str]], results: list[tuple[str, str]]) -> None:
+    _tee("\n=== Summary ===\n", sinks)
+    width = max((len(name) for name, _ in results), default=0)
+    for name, status in results:
+        _tee(f"  {name:<{width}}  {status}\n", sinks)
+
+
 def _run_fix_home(config_path: str, sinks: list[IO[str]], sudo_user: str | None = None) -> int:
     """Verify that no fix-home action is pending for `sudo_user` (or the current user)."""
     prefix = ["sudo", "-Hu", sudo_user] if sudo_user else []
@@ -87,6 +94,7 @@ def run(
 
         results: list[tuple[str, str]] = []
 
+        fix_home_failed = False
         for fix_user in fix_homes_users:
             _tee(f"Running fix-home for {fix_user}\n", sinks)
             rc = _run_fix_home(
@@ -97,8 +105,18 @@ def run(
             if rc != 0:
                 _tee(f"fix-home for {fix_user} exited with {rc}\n", sinks)
                 results.append((f"fix-home/{fix_user}", f"failed (exit {rc})"))
+                fix_home_failed = True
             else:
                 results.append((f"fix-home/{fix_user}", "OK"))
+
+        if fix_home_failed:
+            _tee(
+                "\nAborting: fix-home reported pending actions; not running any backup.\n"
+                "Fix the home layout (or run `restic-in-peace fix-home <config> | bash`) and re-run.\n",
+                sinks,
+            )
+            _print_summary(sinks, results)
+            return 1
 
         for profile in profiles:
             _tee(f"Backing up profile {profile}\n", sinks)
@@ -145,10 +163,7 @@ def run(
                 sub, rc = profile_failure
                 results.append((profile, f"{sub} failed (exit {rc})"))
 
-        _tee("\n=== Summary ===\n", sinks)
-        width = max((len(name) for name, _ in results), default=0)
-        for name, status in results:
-            _tee(f"  {name:<{width}}  {status}\n", sinks)
+        _print_summary(sinks, results)
 
         failures = sum(1 for _, status in results if status != "OK")
         if failures:

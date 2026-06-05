@@ -244,7 +244,7 @@ def test_falls_back_to_stderr_when_log_path_missing(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
 
 
-def test_continues_after_fix_home_strict_fails(
+def test_fix_home_failure_aborts_run_backup(
     fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, write_config, test_env
 ):
     # fix-home is in a state that --strict will report as needing action.
@@ -261,16 +261,16 @@ def test_continues_after_fix_home_strict_fails(
         [rip_bin, "run-backup", str(config)],
         capture_output=True, text=True, env=test_env,
     )
-    # Overall exit is non-zero because fix-home reported a failure...
+    # fix-home failed → run-backup aborts before any backup runs.
     assert result.returncode != 0
-    # ...but the backup still ran (continue-on-failure) and produced a snapshot.
-    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
 
     run_dir = next(iter(log_dir.iterdir()))
     log = (run_dir / "backup.log").read_text()
-    assert "=== Summary ===" in log
+    assert "Aborting: fix-home reported pending actions" in log
     assert f"fix-home/{current_user}" in log and "failed" in log
-    assert "p1" in log and "OK" in log
+    # Profile loop never ran.
+    assert "Backing up profile" not in log
 
 
 def test_continues_after_one_profile_fails(
