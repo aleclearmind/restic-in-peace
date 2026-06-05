@@ -51,13 +51,16 @@ def collect_items(
     pbar = None
     if interactive:
         from tqdm import tqdm
+        # Start indeterminate (no total). When `scan_finished` arrives we
+        # know the total — switch to a determinate bar at that point.
         pbar = tqdm(
-            desc=f"dry-run {name}",
-            unit=" files",
+            desc=f"dry-run {name} (scanning)",
+            unit="B", unit_scale=True, unit_divisor=1024,
             dynamic_ncols=True,
             leave=False,
         )
 
+    scan_done = False
     last_text_progress = 0.0
 
     def emit_text(text: str) -> None:
@@ -74,35 +77,46 @@ def collect_items(
             continue
 
         action = msg.get("action")
+
+        if action == "scan_finished":
+            scan_done = True
+            tf = msg.get("total_files", 0)
+            tb = msg.get("data_size", 0)
+            if pbar is not None:
+                pbar.set_description_str(f"dry-run {name} (processing)")
+                pbar.reset(total=tb if tb > 0 else None)
+            else:
+                emit_text(f"  dry-run scan complete: {tf} files, {tb} bytes\n")
+                last_text_progress = time.monotonic()
+            continue
+
         if action in interesting_actions:
             item = msg.get("item")
             if item and not item.endswith("/"):
                 try:
                     st = os.stat(item)
-                    items.append((item, st.st_size, st.st_blocks * 512))
+                    asize, dsize = st.st_size, st.st_blocks * 512
                 except OSError:
-                    items.append((item, 0, 0))
-                if pbar is not None:
-                    pbar.update(1)
+                    asize, dsize = 0, 0
+                items.append((item, asize, dsize))
+                if pbar is not None and asize > 0:
+                    pbar.update(asize)
+            continue
 
-        if action == "scan_finished":
-            tf = msg.get("total_files", 0)
-            tb = msg.get("data_size", 0)
-            if pbar is not None:
-                pbar.set_postfix_str(f"scan: {tf} files, {tb} bytes")
-            else:
-                emit_text(f"  dry-run scan complete: {tf} files, {tb} bytes\n")
-                last_text_progress = time.monotonic()
-        elif msg.get("message_type") == "status":
+        if msg.get("message_type") == "status":
             tf, fd = msg.get("total_files", 0), msg.get("files_done", 0)
             tb, bd = msg.get("total_bytes", 0), msg.get("bytes_done", 0)
-            phase = "scanning" if fd == 0 else "processing"
             if pbar is not None:
-                pbar.set_postfix_str(f"{phase}: {fd}/{tf} files, {bd}/{tb} bytes")
+                # Pre-scan_finished: sync to total_bytes (bytes discovered).
+                # Post-scan_finished: sync to bytes_done (bytes processed).
+                target = bd if scan_done else tb
+                if target > pbar.n:
+                    pbar.update(target - pbar.n)
             else:
                 now = time.monotonic()
                 if now - last_text_progress >= 1.0:
                     last_text_progress = now
+                    phase = "scanning" if not scan_done else "processing"
                     emit_text(f"  dry-run {phase}: {fd}/{tf} files, {bd}/{tb} bytes\n")
 
     process.wait()
