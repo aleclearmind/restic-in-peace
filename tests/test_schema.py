@@ -17,14 +17,14 @@ def _write(tmp_path: Path, config: Any) -> str:
 
 def test_full_config_validates(tmp_path: Path) -> None:
     config = {
+        "added-size-limit": "5GB",
+        "skip-on-battery": True,
+        "wifi-whitelist": ["home-net"],
+        "monitor-url": ["https://m.example/restic"],
         "profiles": {
             "common": {
                 "repository": "/backup",
                 "env": {"RESTIC_PASSWORD": "x"},
-                "added-size-limit": "5GB",
-                "skip-on-battery": True,
-                "wifi-whitelist": ["home-net"],
-                "monitor-url": ["https://m.example/restic"],
             },
             "laptop": {
                 "inherit": "common",
@@ -35,11 +35,27 @@ def test_full_config_validates(tmp_path: Path) -> None:
         "fix-homes": {
             "me": {"ignore": [".cache"], ".dotfiles": [".vimrc", ".bashrc"]},
         },
-        "run-backup": {"log-path": "/var/log/rip"},
+        "log-path": "/var/log/rip",
     }
     path = _write(tmp_path, config)
     loaded = profile.load_config(path)
     assert loaded == config
+
+
+def test_rip_options_rejected_inside_profiles(tmp_path: Path) -> None:
+    # added-size-limit (and friends) now live under the top-level `rip:` section.
+    # Putting them inside a profile is a schema error.
+    path = _write(tmp_path, {
+        "profiles": {"p1": {"repository": "/x", "added-size-limit": "5GB"}},
+    })
+    with pytest.raises(profile.ConfigError, match="added-size-limit|additional"):
+        profile.load_config(path)
+
+
+def test_unknown_top_level_rip_key_rejected(tmp_path: Path) -> None:
+    path = _write(tmp_path, {"made-up": 1})
+    with pytest.raises(profile.ConfigError, match="made-up|additional"):
+        profile.load_config(path)
 
 
 def test_empty_file_validates(tmp_path: Path) -> None:
@@ -54,10 +70,10 @@ def test_unknown_top_level_key_rejected(tmp_path: Path) -> None:
         profile.load_config(path)
 
 
-def test_run_backup_without_log_path_is_valid(tmp_path: Path) -> None:
+def test_log_path_is_optional(tmp_path: Path) -> None:
     # log-path is optional; run-backup falls back to stderr when missing.
-    path = _write(tmp_path, {"run-backup": {}})
-    assert profile.load_config(path) == {"run-backup": {}}
+    path = _write(tmp_path, {})
+    assert profile.load_config(path) == {}
 
 
 def test_fix_home_value_must_be_list_of_strings(tmp_path: Path) -> None:
@@ -73,7 +89,7 @@ def test_profile_inherit_must_be_string(tmp_path: Path) -> None:
 
 
 def test_skip_on_battery_must_be_bool(tmp_path: Path) -> None:
-    path = _write(tmp_path, {"profiles": {"p1": {"skip-on-battery": "yes"}}})
+    path = _write(tmp_path, {"skip-on-battery": "yes"})
     with pytest.raises(profile.ConfigError, match="skip-on-battery"):
         profile.load_config(path)
 

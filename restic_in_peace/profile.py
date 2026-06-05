@@ -23,13 +23,19 @@ COMMAND_SECTIONS = frozenset({
 })
 
 
-_RIP_PROFILE_PROPERTIES: dict[str, dict[str, Any]] = {
+_PROFILE_PROPERTIES: dict[str, dict[str, Any]] = {
     "inherit": {"type": "string"},
     "repository": {"type": "string"},  # alias for restic's --repo
     "env": {
         "type": "object",
         "additionalProperties": {"type": ["string", "number", "boolean"]},
     },
+}
+
+# Top-level `rip:` section: knobs that describe rip's behavior (how it
+# orchestrates) rather than a particular restic invocation. Same set is
+# rejected if it appears inside a profile.
+_RIP_PROPERTIES: dict[str, dict[str, Any]] = {
     "added-size-limit": {"type": ["string", "integer"]},
     "skip-on-battery": {"type": "boolean"},
     "wifi-whitelist": {"type": "array", "items": {"type": "string"}},
@@ -37,6 +43,7 @@ _RIP_PROFILE_PROPERTIES: dict[str, dict[str, Any]] = {
     "monitor-url": {"type": "array", "items": {"type": "string"}},
     "desktop-notifications": {"type": "boolean"},
     "tee-restic-logs": {"type": "string"},
+    "loglevel": {"type": "string"},
 }
 
 
@@ -58,7 +65,7 @@ _RESTIC_FLAGS = _load_restic_flags()
 
 
 def _build_profile_schema() -> dict[str, Any]:
-    properties: dict[str, dict[str, Any]] = {**_RESTIC_FLAGS, **_RIP_PROFILE_PROPERTIES}
+    properties: dict[str, dict[str, Any]] = {**_RESTIC_FLAGS, **_PROFILE_PROPERTIES}
     # Command sub-sections (backup:, forget:, ...) stay permissive — each
     # holds command-local restic flags we don't enumerate per-command.
     for section in COMMAND_SECTIONS:
@@ -75,6 +82,7 @@ CONFIG_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
+        # Sections
         "profiles": {
             "type": "object",
             "additionalProperties": {"$ref": "#/$defs/profile"},
@@ -83,13 +91,9 @@ CONFIG_SCHEMA: dict[str, Any] = {
             "type": "object",
             "additionalProperties": {"$ref": "#/$defs/fixHomeUser"},
         },
-        "run-backup": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "log-path": {"type": "string"},
-            },
-        },
+        # Top-level rip knobs (these are rejected inside profiles).
+        "log-path": {"type": "string"},
+        **_RIP_PROPERTIES,
     },
     "$defs": {
         "profile": _build_profile_schema(),
@@ -102,6 +106,11 @@ CONFIG_SCHEMA: dict[str, Any] = {
         },
     },
 }
+
+
+def rip_settings(config: dict[str, Any]) -> dict[str, Any]:
+    """Return the rip-only knobs that live at the top level of the config."""
+    return {k: v for k, v in config.items() if k in _RIP_PROPERTIES}
 
 _validator = jsonschema.Draft202012Validator(CONFIG_SCHEMA)
 
@@ -191,21 +200,9 @@ def has_section(config: dict[str, Any], name: str, section: str) -> bool:
     return False
 
 
-# Keys rip understands but restic does not — filter these out when invoking
-# restic directly (e.g. from the collect-non-backuped-files command).
-RIP_ONLY = frozenset({
-    "added-size-limit", "skip-on-battery", "wifi-whitelist", "wifi-blacklist",
-    "monitor-url", "desktop-notifications", "tee-restic-logs", "loglevel",
-})
-
-
-def to_argv(
-    settings: dict[str, Any],
-    command: str,
-    drop_keys: frozenset[str] = frozenset(),
-) -> tuple[list[str], list[str]]:
+def to_argv(settings: dict[str, Any], command: str) -> tuple[list[str], list[str]]:
     """Translate `settings` (from `resolve`) to flag args and positional args."""
-    settings = {k: v for k, v in settings.items() if k not in drop_keys}
+    settings = dict(settings)
     sources = settings.pop("source", []) if command == "backup" else []
     if isinstance(sources, str):
         sources = [sources]

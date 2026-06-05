@@ -1,18 +1,18 @@
+added-size-limit: 5GB
+skip-on-battery: true
+wifi-whitelist:
+  - whitelisted-network
+wifi-blacklist:
+  - blacklisted-network
+monitor-url:
+  - https://<monitor_host>/restic
+desktop-notifications: true
+
 profiles:
   common:
     repository: <repo_path_or_url>
     env:
       RESTIC_PASSWORD: <your-strong-password>
-    added-size-limit: 5GB
-    skip-on-battery: true
-    wifi-whitelist:
-      - whitelisted-network
-    wifi-blacklist:
-      - blacklisted-network
-    monitor-url:
-      - https://<monitor_host>/restic
-    backup:
-      desktop-notifications: true
     forget:
       keep-daily: 7
       keep-weekly: 4
@@ -36,5 +36,4 @@ fix-homes:
       - .vimrc
       - .bashrc
 
-run-backup:
-  log-path: backup-logs
+log-path: backup-logs

@@ -11,7 +11,7 @@ from typing import IO
 
 from . import diagnose
 from . import profile as profile_mod
-from .utils import human_numbers, logger
+from .utils import battery, human_numbers, logger, network
 
 
 def _tee(text: str, sinks: list[IO[str]]) -> None:
@@ -36,10 +36,9 @@ def _stream(cmd: list[str], sinks: list[IO[str]], env: dict[str, str] | None = N
     return process.wait()
 
 
-def _profile_size_limit(config: dict, profile: str) -> int | None:
-    """Resolve the profile and return its added-size-limit as bytes (or None)."""
-    settings, _ = profile_mod.resolve(config, profile, "backup")
-    raw = settings.get("added-size-limit")
+def _size_limit_bytes(config: dict) -> int | None:
+    """Return the rip-wide added-size-limit as bytes, or None if unset."""
+    raw = profile_mod.rip_settings(config).get("added-size-limit")
     if raw is None:
         return None
     if isinstance(raw, int):
@@ -56,7 +55,7 @@ def _exceeds_size_limit(
     diag_path: Path | None,
     sinks: list[IO[str]],
 ) -> bool:
-    limit = _profile_size_limit(config, profile)
+    limit = _size_limit_bytes(config)
     if limit is None or not items:
         return False
     total = sum(asize for _, asize, _ in items)
@@ -107,7 +106,18 @@ def run(
         logger.error(str(e))
         return 1
 
-    log_dir_str = log_path or config.get("run-backup", {}).get("log-path")
+    rip = profile_mod.rip_settings(config)
+    if not battery.battery_ok(bool(rip.get("skip-on-battery", False))):
+        logger.error("On battery power; skipping the whole run.")
+        return 1
+    if not network.network_ok(
+        blacklist=rip.get("wifi-blacklist", []),
+        whitelist=rip.get("wifi-whitelist", []),
+    ):
+        logger.error("Network conditions don't allow backup; skipping the whole run.")
+        return 1
+
+    log_dir_str = log_path or config.get("log-path")
     fix_homes_users = list(config.get("fix-homes", {}).keys())
     profiles = profile_mod.children_of(config, "common")
     if only:
@@ -203,9 +213,7 @@ def run(
             profile_failure: tuple[str, int] | None = None
             for subcommand in subcommands:
                 settings, env_vars = profile_mod.resolve(config, profile, subcommand)
-                flags, positionals = profile_mod.to_argv(
-                    settings, subcommand, drop_keys=profile_mod.RIP_ONLY,
-                )
+                flags, positionals = profile_mod.to_argv(settings, subcommand)
                 cmd = ["restic", subcommand] + flags + positionals
                 if dry_run and subcommand in ("backup", "forget"):
                     cmd.append("--dry-run")

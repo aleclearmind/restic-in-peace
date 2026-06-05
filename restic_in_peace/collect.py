@@ -26,7 +26,7 @@ def _restic_command(
     extra_args: tuple[str, ...] = (),
 ) -> tuple[list[str], dict[str, Any]]:
     settings, env = profile_mod.resolve(config, name, command)
-    flags, positionals = profile_mod.to_argv(settings, command, drop_keys=profile_mod.RIP_ONLY)
+    flags, positionals = profile_mod.to_argv(settings, command)
     return ["restic", command] + flags + list(extra_args) + positionals, env
 
 

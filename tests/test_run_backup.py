@@ -5,7 +5,7 @@ from .conftest import snapshot_count
 
 def _config_dict(log_dir, repo, password, source, fix_homes=None):
     config = {
-        "run-backup": {"log-path": str(log_dir)},
+        "log-path": str(log_dir),
         "profiles": {
             "common": {
                 "repository": str(repo),
@@ -64,7 +64,7 @@ def test_runs_forget_when_section_present(
     (fake_home / "doc.txt").write_text("v1\n")
     log_dir = tmp_path / "logs"
     config_path = write_config({
-        "run-backup": {"log-path": str(log_dir)},
+        "log-path": str(log_dir),
         "profiles": {
             "common": {
                 "repository": str(restic_repo),
@@ -127,12 +127,12 @@ def test_size_limit_skips_profile_in_run_backup(
     (fake_home / "big.bin").write_bytes(b"x" * 50_000)
     log_dir = tmp_path / "logs"
     config = write_config({
-        "run-backup": {"log-path": str(log_dir)},
+        "added-size-limit": "1KB",
+        "log-path": str(log_dir),
         "profiles": {
             "common": {
                 "repository": str(restic_repo),
                 "env": {"RESTIC_PASSWORD": restic_password},
-                "added-size-limit": "1KB",
             },
             "p1": {
                 "inherit": "common",
@@ -172,7 +172,7 @@ def test_only_filters_profiles_by_name(
     log_dir = tmp_path / "logs"
 
     config = write_config({
-        "run-backup": {"log-path": str(log_dir)},
+        "log-path": str(log_dir),
         "profiles": {
             "common": {"env": {"RESTIC_PASSWORD": restic_password}},
             "alpha": {
@@ -324,7 +324,7 @@ def test_continues_after_one_profile_fails(
     (fake_home / "doc.txt").write_text("hi\n")
     log_dir = tmp_path / "logs"
     config = write_config({
-        "run-backup": {"log-path": str(log_dir)},
+        "log-path": str(log_dir),
         "profiles": {
             "common": {
                 "env": {"RESTIC_PASSWORD": restic_password},
