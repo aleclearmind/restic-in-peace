@@ -201,17 +201,11 @@ def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None
                             logger.error(f"Could not summarize diagnostic: {e}")
                             sigs = []
                         if sigs:
-                            logger.critical("Paths contributing ≥10%% of the data to back up:")
+                            logger.critical("Paths contributing ≥5%% of the data to back up:")
                             for path, size in sigs:
                                 logger.critical(f"  {human_numbers.to_si(size):>10s}  {path}")
                     process.send_signal(signal.SIGINT)
-                    process.wait(timeout=10)
-                    if process.poll() is None:
-                        logger.warning("Restic did not gracefully terminate within 10 seconds, sending SIGKILL")
-                        logger.warning("You might need to run the unlock command")
-                        process.kill()
-                        process.wait()
-
+                    process.wait()
                     raise TooMuchDataException(message)
 
             elif parsed["message_type"] == "status":

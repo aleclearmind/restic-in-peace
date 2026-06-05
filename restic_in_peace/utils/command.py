@@ -58,9 +58,8 @@ def build_restic_command(
 
 
 class EnsureGracefulExit:
-    def __init__(self, subproc, timeout=10):
+    def __init__(self, subproc):
         self.subprocess: subprocess.Popen = subproc
-        self.timeout = timeout
 
     def __enter__(self):
         return self
@@ -69,11 +68,7 @@ class EnsureGracefulExit:
         if self.subprocess.poll():
             return
 
-        # TODO: should we terminate the subprocess with other signals/exceptions?
         if exc_type is KeyboardInterrupt:
             self.subprocess.send_signal(signal.SIGINT)
-            self.subprocess.wait(timeout=self.timeout)
-            if self.subprocess.poll() is None:
-                self.subprocess.kill()
-                self.subprocess.wait()
+            self.subprocess.wait()
             return True

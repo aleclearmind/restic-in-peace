@@ -114,7 +114,7 @@ def _join(path: str, name: str) -> str:
     return str(PurePosixPath(path) / name)
 
 
-def significant_items(ncdu_doc: list[Any], threshold_fraction: float = 0.1) -> list[tuple[str, int]]:
+def significant_items(ncdu_doc: list[Any], threshold_fraction: float = 0.05) -> list[tuple[str, int]]:
     """Return the most-specific (path, size) pairs whose apparent size is at
     least `threshold_fraction` of the total.
 
