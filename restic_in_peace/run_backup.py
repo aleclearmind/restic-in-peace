@@ -201,13 +201,15 @@ def run(
 
             profile_failure: tuple[str, int] | None = None
             for subcommand in subcommands:
-                cmd = ["restic-in-peace", "--config", config_path, "--name", profile, "restic", subcommand]
+                settings, env_vars = profile_mod.resolve(config, profile, subcommand)
+                flags, positionals = profile_mod.to_argv(
+                    settings, subcommand, drop_keys=profile_mod.RIP_ONLY,
+                )
+                cmd = ["restic", subcommand] + flags + positionals
                 if dry_run and subcommand in ("backup", "forget"):
                     cmd.append("--dry-run")
-                sub_env: dict[str, str] | None = None
-                if subcommand == "backup" and diag_path is not None:
-                    sub_env = {**os.environ, "RIP_DIAGNOSTIC_FILE": str(diag_path)}
-                rc = _stream(cmd, sinks, env=sub_env)
+                proc_env = {**os.environ, **{k: str(v) for k, v in env_vars.items()}}
+                rc = _stream(cmd, sinks, env=proc_env)
                 if rc != 0:
                     _tee(f"{subcommand} for {profile} exited with {rc}\n", sinks)
                     profile_failure = (subcommand, rc)

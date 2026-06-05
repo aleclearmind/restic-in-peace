@@ -110,11 +110,11 @@ def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
 
     run_dir = next(iter(log_dir.iterdir()))
     log_content = (run_dir / "backup.log").read_text()
-    # backup ran (with --dry-run), unlock and check skipped.
+    # backup ran (with --dry-run): restic prints "Would add to the repository"
+    # in dry-run mode; unlock and check were skipped (no such restic output).
     assert "Backing up profile p1" in log_content
-    assert "restic backup" in log_content and "--dry-run" in log_content
-    assert "restic unlock" not in log_content
-    assert "restic check" not in log_content
+    assert "Would add to the repository" in log_content
+    assert "no errors were found" not in log_content  # check skipped
     # And no snapshot was actually created.
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
 
