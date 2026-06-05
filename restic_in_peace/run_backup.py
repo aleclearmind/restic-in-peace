@@ -175,7 +175,8 @@ def run(
             items: list[tuple[str, int, int]] = []
             ncdu_doc: list | None = None
             try:
-                items = diagnose.collect_items(config, profile)
+                _tee(f"Dry-run pre-pass for {profile} (this can take a while)...\n", sinks)
+                items = diagnose.collect_items(config, profile, progress_sinks=sinks)
                 ncdu_doc = diagnose.build_ncdu(items)
                 if run_dir is not None:
                     diag_path = run_dir / f"{profile}.ncdu.json"

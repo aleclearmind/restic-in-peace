@@ -5,19 +5,27 @@ import os
 import subprocess
 import time
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import IO, Any
 
 from . import profile as profile_mod
 from . import version
 
 
-def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int, int]]:
-    """Run `restic backup --dry-run --verbose=2 --json` for profile `name`
+def collect_items(
+    config: dict[str, Any],
+    name: str,
+    progress_sinks: list[IO[str]] | None = None,
+) -> list[tuple[str, int, int]]:
+    """Stream `restic backup --dry-run --verbose=2 --json` for profile `name`
     and return [(path, asize, dsize), ...] for every file restic would add.
 
     asize is the file's apparent size (st_size); dsize is its actual disk
     usage (st_blocks * 512). ncdu's default view is the disk-usage one, so
     we have to provide dsize or it shows 0.0 B for everything.
+
+    If `progress_sinks` is given, a one-line progress update is written to
+    each sink at most once per second (running file/byte counters during the
+    scan, then a final "scan complete" line).
     """
     settings, env = profile_mod.resolve(config, name, "backup")
     flags, positionals = profile_mod.to_argv(settings, "backup", drop_keys=profile_mod.RIP_ONLY)
@@ -26,33 +34,57 @@ def collect_items(config: dict[str, Any], name: str) -> list[tuple[str, int, int
 
     proc_env = os.environ.copy()
     proc_env.update({k: str(v) for k, v in env.items()})
-    result = subprocess.run(cmd, env=proc_env, capture_output=True, text=True)
 
-    # restic emits action="new" for files that aren't in any previous
-    # snapshot and action="modified" for files whose content changed since
-    # the last snapshot. Both contribute bytes to this backup; only
-    # "unchanged" files (and the scan_finished event) don't.
+    process = subprocess.Popen(
+        cmd, env=proc_env,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, bufsize=1,
+    )
+    assert process.stdout is not None
+
     interesting_actions = {"new", "modified", "changed"}
-
     items: list[tuple[str, int, int]] = []
-    for line in result.stdout.splitlines():
+    last_progress = 0.0
+
+    def emit(text: str) -> None:
+        if not progress_sinks:
+            return
+        for sink in progress_sinks:
+            sink.write(text)
+            sink.flush()
+
+    for line in process.stdout:
         try:
             msg = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if msg.get("action") not in interesting_actions:
-            continue
-        item = msg.get("item")
-        if not item or item.endswith("/"):
-            # restic emits a status entry for each ancestor directory too;
-            # skip them (ncdu computes directory totals from contents).
-            continue
-        try:
-            st = os.stat(item)
-            asize, dsize = st.st_size, st.st_blocks * 512
-        except OSError:
-            asize, dsize = 0, 0
-        items.append((item, asize, dsize))
+
+        action = msg.get("action")
+        if action in interesting_actions:
+            item = msg.get("item")
+            if item and not item.endswith("/"):
+                try:
+                    st = os.stat(item)
+                    items.append((item, st.st_size, st.st_blocks * 512))
+                except OSError:
+                    items.append((item, 0, 0))
+
+        if action == "scan_finished":
+            emit(
+                f"  dry-run scan complete: {msg.get('total_files', 0)} files, "
+                f"{msg.get('data_size', 0)} bytes\n"
+            )
+            last_progress = time.monotonic()
+        elif msg.get("message_type") == "status":
+            now = time.monotonic()
+            if now - last_progress >= 1.0:
+                last_progress = now
+                tf, fd = msg.get("total_files", 0), msg.get("files_done", 0)
+                tb, bd = msg.get("total_bytes", 0), msg.get("bytes_done", 0)
+                phase = "scanning" if fd == 0 else "processing"
+                emit(f"  dry-run {phase}: {fd}/{tf} files, {bd}/{tb} bytes\n")
+
+    process.wait()
     return items
 
 
