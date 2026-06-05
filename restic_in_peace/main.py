@@ -23,84 +23,77 @@ return_codes: dict[str, int] = {
 }
 
 # WARN: boolean arguments must have action store_true, otherwise build_restic_command result will be incorrect
-argparser = argparse.ArgumentParser(
-    prog="restic-in-peace",
-    description=description,
-)
-# --config/--name are intercepted before argparser runs (see entrypoint), but
-# listed here so they appear in --help.
-argparser.add_argument("-c", "--config", metavar="FILE", help="path to rip.yaml (use with --name)")
-argparser.add_argument("-n", "--name", metavar="PROFILE", help="profile name within --config")
-argparser.add_argument("--loglevel", default="INFO", help="Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL)")
+def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
+    """Construct the rip argument parser plus the lightweight pre-parser that
+    extracts -c/--config and -n/--name before the main parser runs.
 
-subparsers = argparser.add_subparsers(dest="command", required=True, metavar="<subcommand>")
+    Returned as (main, pre)."""
+    main = argparse.ArgumentParser(prog="restic-in-peace", description=description)
+    # --config/--name are intercepted before argparser runs (see entrypoint), but
+    # listed here so they appear in --help.
+    main.add_argument("-c", "--config", metavar="FILE", help="path to rip.yaml (use with --name)")
+    main.add_argument("-n", "--name", metavar="PROFILE", help="profile name within --config")
+    main.add_argument("--loglevel", default="INFO",
+        help="Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
-# `restic` — runs a restic command (the `backup` subcommand goes through rip's
-# size-limit/battery/network/notification pipeline; the rest pass through).
-_restic = subparsers.add_parser(
-    "restic",
-    help="run a restic command; `backup` goes through rip's gates and notifications",
-)
-_restic.add_argument("--added-size-limit", type=human_numbers.parse,
-    help="abort backup if restic would add more than this many bytes")
-_restic.add_argument("--wifi-whitelist", action="append", default=[],
-    help="skip backup unless the active wifi matches one of these regexes (repeatable)")
-_restic.add_argument("--wifi-blacklist", action="append", default=[],
-    help="skip backup if the active wifi matches one of these regexes (repeatable)")
-_restic.add_argument("--skip-on-battery", action="store_true", dest="skip_on_battery",
-    help="skip the backup if the computer is on battery")
-_restic.add_argument("--no-skip-on-battery", action="store_false", dest="skip_on_battery",
-    help="force the backup even if the computer is on battery")
-_restic.add_argument("--monitor-url", action="append", default=[],
-    help="POST event JSON to this URL on backup transitions (repeatable)")
-_restic.add_argument("--desktop-notifications", action="store_true",
-    help="send notify-send notifications on backup transitions")
-_restic.add_argument("--tee-restic-logs", metavar="FILE",
-    help="duplicate restic's output to this file (@CMD/@FD substituted)")
-_restic.add_argument("--tag", action="append",
-    help="restic tag (also used as the size-limit baseline filter; highly recommended)")
-_restic.add_argument("-r", "--repo", help="restic repository")
-_restic.add_argument("-p", "--password-file", help=argparse.SUPPRESS)
-_restic.add_argument("--password-command", help=argparse.SUPPRESS)
-_restic.add_argument("-v", "--verbose", nargs="?", metavar="LEVEL",
-    help="verbose output (forwarded to restic)")
-_restic.add_argument("--dry-run", action="store_true", dest="dry_run",
-    help="forward --dry-run to restic (supported by backup/forget/prune)")
-# Everything after the rip flags is the restic subcommand + restic args.
-# parse_known_args drops them into `remaining`; we re-extract the subcommand
-# in entrypoint and stash the rest as unparsed.
+    subparsers = main.add_subparsers(dest="command", required=True, metavar="<subcommand>")
 
-# `fix-home`
-_fix_home = subparsers.add_parser(
-    "fix-home",
-    help="emit a bash script (or --strict-check) for fix-homes/$USER dotfile symlinks",
-)
-_fix_home.add_argument("--strict", action="store_true",
-    help="fail non-zero if any move/link would be needed; emit no bash")
-_fix_home.add_argument("config", nargs="?", default="rip.yaml",
-    help="config file (default: rip.yaml in CWD)")
+    restic = subparsers.add_parser("restic",
+        help="run a restic command; `backup` goes through rip's gates and notifications")
+    restic.add_argument("--added-size-limit", type=human_numbers.parse,
+        help="abort backup if restic would add more than this many bytes")
+    restic.add_argument("--wifi-whitelist", action="append", default=[],
+        help="skip backup unless the active wifi matches one of these regexes (repeatable)")
+    restic.add_argument("--wifi-blacklist", action="append", default=[],
+        help="skip backup if the active wifi matches one of these regexes (repeatable)")
+    restic.add_argument("--skip-on-battery", action="store_true", dest="skip_on_battery",
+        help="skip the backup if the computer is on battery")
+    restic.add_argument("--no-skip-on-battery", action="store_false", dest="skip_on_battery",
+        help="force the backup even if the computer is on battery")
+    restic.add_argument("--monitor-url", action="append", default=[],
+        help="POST event JSON to this URL on backup transitions (repeatable)")
+    restic.add_argument("--desktop-notifications", action="store_true",
+        help="send notify-send notifications on backup transitions")
+    restic.add_argument("--tee-restic-logs", metavar="FILE",
+        help="duplicate restic's output to this file (@CMD/@FD substituted)")
+    restic.add_argument("--tag", action="append",
+        help="restic tag (also used as the size-limit baseline filter; highly recommended)")
+    restic.add_argument("-r", "--repo", help="restic repository")
+    restic.add_argument("-p", "--password-file", help=argparse.SUPPRESS)
+    restic.add_argument("--password-command", help=argparse.SUPPRESS)
+    restic.add_argument("-v", "--verbose", nargs="?", metavar="LEVEL",
+        help="verbose output (forwarded to restic)")
+    restic.add_argument("--dry-run", action="store_true", dest="dry_run",
+        help="forward --dry-run to restic (supported by backup/forget/prune)")
 
-# `run-backup`
-_run_backup = subparsers.add_parser(
-    "run-backup",
-    help="orchestrate fix-home + unlock + backup + forget + check for every "
-         "profile inheriting from common; write per-profile ncdu diagnostic",
-)
-_run_backup.add_argument("--dry-run", action="store_true", dest="dry_run",
-    help="skip unlock and check, pass --dry-run to backup and forget")
-_run_backup.add_argument("--log-path", dest="log_path", metavar="DIR",
-    help="directory where the dated <run> subdir goes (overrides run-backup.log-path)")
-_run_backup.add_argument("--only", action="append", default=[], metavar="PROFILE",
-    help="only back up profiles with these names; can be repeated")
-_run_backup.add_argument("config", help="config file")
+    fix_home = subparsers.add_parser("fix-home",
+        help="emit a bash script (or --strict-check) for fix-homes/$USER dotfile symlinks")
+    fix_home.add_argument("--strict", action="store_true",
+        help="fail non-zero if any move/link would be needed; emit no bash")
+    fix_home.add_argument("config", nargs="?", default="rip.yaml",
+        help="config file (default: rip.yaml in CWD)")
 
-# `collect-non-backuped-files`
-_collect = subparsers.add_parser(
-    "collect-non-backuped-files",
-    help="list files present on disk that no common-inheriting profile would back up",
-)
-_collect.add_argument("config", help="config file")
-_collect.add_argument("output_dir", help="output directory")
+    run_backup_p = subparsers.add_parser("run-backup",
+        help="orchestrate fix-home + unlock + backup + forget + check for every "
+             "profile inheriting from common; write per-profile ncdu diagnostic")
+    run_backup_p.add_argument("--dry-run", action="store_true", dest="dry_run",
+        help="skip unlock and check, pass --dry-run to backup and forget")
+    run_backup_p.add_argument("--log-path", dest="log_path", metavar="DIR",
+        help="directory where the dated <run> subdir goes (overrides run-backup.log-path)")
+    run_backup_p.add_argument("--only", action="append", default=[], metavar="PROFILE",
+        help="only back up profiles with these names; can be repeated")
+    run_backup_p.add_argument("config", help="config file")
+
+    collect = subparsers.add_parser("collect-non-backuped-files",
+        help="list files present on disk that no common-inheriting profile would back up")
+    collect.add_argument("config", help="config file")
+    collect.add_argument("output_dir", help="output directory")
+
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("-c", "--config")
+    pre.add_argument("-n", "--name")
+
+    return main, pre
 
 
 def get_latest_snapshot_stats(args: argparse.Namespace) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
@@ -422,13 +415,9 @@ class TooMuchDataException(Exception):
         super().__init__(message, *args)
 
 
-_profile_pre_parser = argparse.ArgumentParser(add_help=False)
-_profile_pre_parser.add_argument("-c", "--config")
-_profile_pre_parser.add_argument("-n", "--name")
-
-
 def entrypoint() -> None:
-    pre_args, argv = _profile_pre_parser.parse_known_args(sys.argv[1:])
+    argparser, pre_parser = _build_parsers()
+    pre_args, argv = pre_parser.parse_known_args(sys.argv[1:])
     config_path, profile_name = pre_args.config, pre_args.name
 
     if config_path or profile_name:
