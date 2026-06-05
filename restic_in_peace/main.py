@@ -190,9 +190,20 @@ def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None
                     diag_file = os.environ.get("RIP_DIAGNOSTIC_FILE")
                     if diag_file and os.path.exists(diag_file):
                         logger.critical(
-                            f"To investigate, open the ncdu diagnostic and press 'a' "
-                            f"for apparent size:  ncdu -f {shlex.quote(diag_file)}"
+                            f"To investigate:  ncdu --apparent-size -f {shlex.quote(diag_file)}"
                         )
+                        try:
+                            from .diagnose import significant_items
+                            with open(diag_file) as f:
+                                ncdu_doc = json.load(f)
+                            sigs = significant_items(ncdu_doc)
+                        except Exception as e:
+                            logger.error(f"Could not summarize diagnostic: {e}")
+                            sigs = []
+                        if sigs:
+                            logger.critical("Paths contributing ≥10%% of the data to back up:")
+                            for path, size in sigs:
+                                logger.critical(f"  {human_numbers.to_si(size):>10s}  {path}")
                     process.send_signal(signal.SIGINT)
                     process.wait(timeout=10)
                     if process.poll() is None:

@@ -39,11 +39,16 @@ def test_size_limit_aborts_backup(
 def test_size_limit_message_points_at_ncdu_diagnostic(
     fake_home, restic_repo, restic_password, rip_bin, restic_bin, tmp_path, test_env_with_password
 ):
+    import json as _json
     (fake_home / "big.bin").write_bytes(b"x" * 10_000)
     # Simulate run-backup's env: a pre-written ncdu diagnostic the backup
-    # pipeline should point the user at on size-limit abort.
+    # pipeline should point the user at on size-limit abort. The diagnostic
+    # lists one big file so significant_items reports it.
     diag = tmp_path / "p1.ncdu.json"
-    diag.write_text("[]\n")
+    diag.write_text(_json.dumps([
+        1, 2, {"progname": "test", "progver": "0", "timestamp": 0},
+        [{"name": "/"}, {"name": "big.bin", "asize": 10000, "dsize": 10000}],
+    ]))
     env = {**test_env_with_password, "RIP_DIAGNOSTIC_FILE": str(diag)}
 
     result = subprocess.run(
@@ -58,4 +63,6 @@ def test_size_limit_message_points_at_ncdu_diagnostic(
     assert result.returncode != 0
     combined = result.stdout + result.stderr
     assert str(diag) in combined
-    assert "ncdu -f" in combined
+    assert "ncdu --apparent-size -f" in combined
+    # The big file should be called out as a significant contributor.
+    assert "/big.bin" in combined

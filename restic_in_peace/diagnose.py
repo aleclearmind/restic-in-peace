@@ -106,6 +106,60 @@ def build_ncdu(items: list[tuple[str, int, int]]) -> list[Any]:
     ]
 
 
+def _join(path: str, name: str) -> str:
+    if name == "/":
+        return "/"
+    if not path:
+        return name
+    return str(PurePosixPath(path) / name)
+
+
+def significant_items(ncdu_doc: list[Any], threshold_fraction: float = 0.1) -> list[tuple[str, int]]:
+    """Return the most-specific (path, size) pairs whose apparent size is at
+    least `threshold_fraction` of the total.
+
+    Post-order DFS: a node is reported iff its asize >= threshold AND none of
+    its descendants is reported. So a big leaf file gets reported (not its
+    parent); a directory full of many small files gets reported once it
+    aggregates past the threshold — but only when no single child is itself
+    over the threshold.
+
+    Returned list is sorted by descending size.
+    """
+    tree = ncdu_doc[3]
+
+    def total_size(node: Any) -> int:
+        if isinstance(node, dict):
+            return int(node.get("asize", 0))
+        return sum(total_size(c) for c in node[1:])
+
+    grand_total = total_size(tree)
+    threshold = grand_total * threshold_fraction
+
+    def walk(node: Any, path: str) -> tuple[int, list[tuple[str, int]]]:
+        if isinstance(node, dict):
+            name = node["name"]
+            size = int(node.get("asize", 0))
+            full = _join(path, name)
+            return size, ([(full, size)] if size >= threshold else [])
+        head = node[0]
+        full = _join(path, head["name"])
+        node_total = 0
+        children_sig: list[tuple[str, int]] = []
+        for child in node[1:]:
+            c_total, c_sig = walk(child, full)
+            node_total += c_total
+            children_sig.extend(c_sig)
+        if children_sig:
+            return node_total, children_sig
+        if node_total >= threshold:
+            return node_total, [(full, node_total)]
+        return node_total, []
+
+    _, sig = walk(tree, "")
+    return sorted(sig, key=lambda x: -x[1])
+
+
 def write_diagnostic(config: dict[str, Any], name: str, output_path: Path) -> None:
     """Collect new items for `name` and write the ncdu JSON to output_path."""
     items = collect_items(config, name)
