@@ -3,3 +3,4 @@ requests
 notify2
 pyyaml
 jsonschema
+tqdm

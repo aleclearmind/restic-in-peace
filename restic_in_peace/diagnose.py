@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path, PurePosixPath
 from typing import IO, Any
@@ -23,9 +24,10 @@ def collect_items(
     usage (st_blocks * 512). ncdu's default view is the disk-usage one, so
     we have to provide dsize or it shows 0.0 B for everything.
 
-    If `progress_sinks` is given, a one-line progress update is written to
-    each sink at most once per second (running file/byte counters during the
-    scan, then a final "scan complete" line).
+    Progress reporting:
+    - If stderr is a TTY, render a tqdm bar (running file count + bytes).
+    - Otherwise (non-interactive, e.g. systemd / nohup / piped), write a
+      one-line update at most once per second to each sink in `progress_sinks`.
     """
     settings, env = profile_mod.resolve(config, name, "backup")
     flags, positionals = profile_mod.to_argv(settings, "backup")
@@ -44,9 +46,21 @@ def collect_items(
 
     interesting_actions = {"new", "modified", "changed"}
     items: list[tuple[str, int, int]] = []
-    last_progress = 0.0
 
-    def emit(text: str) -> None:
+    interactive = sys.stderr.isatty()
+    pbar = None
+    if interactive:
+        from tqdm import tqdm
+        pbar = tqdm(
+            desc=f"dry-run {name}",
+            unit=" files",
+            dynamic_ncols=True,
+            leave=False,
+        )
+
+    last_text_progress = 0.0
+
+    def emit_text(text: str) -> None:
         if not progress_sinks:
             return
         for sink in progress_sinks:
@@ -68,23 +82,32 @@ def collect_items(
                     items.append((item, st.st_size, st.st_blocks * 512))
                 except OSError:
                     items.append((item, 0, 0))
+                if pbar is not None:
+                    pbar.update(1)
 
         if action == "scan_finished":
-            emit(
-                f"  dry-run scan complete: {msg.get('total_files', 0)} files, "
-                f"{msg.get('data_size', 0)} bytes\n"
-            )
-            last_progress = time.monotonic()
+            tf = msg.get("total_files", 0)
+            tb = msg.get("data_size", 0)
+            if pbar is not None:
+                pbar.set_postfix_str(f"scan: {tf} files, {tb} bytes")
+            else:
+                emit_text(f"  dry-run scan complete: {tf} files, {tb} bytes\n")
+                last_text_progress = time.monotonic()
         elif msg.get("message_type") == "status":
-            now = time.monotonic()
-            if now - last_progress >= 1.0:
-                last_progress = now
-                tf, fd = msg.get("total_files", 0), msg.get("files_done", 0)
-                tb, bd = msg.get("total_bytes", 0), msg.get("bytes_done", 0)
-                phase = "scanning" if fd == 0 else "processing"
-                emit(f"  dry-run {phase}: {fd}/{tf} files, {bd}/{tb} bytes\n")
+            tf, fd = msg.get("total_files", 0), msg.get("files_done", 0)
+            tb, bd = msg.get("total_bytes", 0), msg.get("bytes_done", 0)
+            phase = "scanning" if fd == 0 else "processing"
+            if pbar is not None:
+                pbar.set_postfix_str(f"{phase}: {fd}/{tf} files, {bd}/{tb} bytes")
+            else:
+                now = time.monotonic()
+                if now - last_text_progress >= 1.0:
+                    last_text_progress = now
+                    emit_text(f"  dry-run {phase}: {fd}/{tf} files, {bd}/{tb} bytes\n")
 
     process.wait()
+    if pbar is not None:
+        pbar.close()
     return items
 
 

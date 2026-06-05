@@ -24,6 +24,7 @@
             notify2
             pyyaml
             jsonschema
+            tqdm
           ];
 
           # restic is needed at build time (setup.py regenerates
@@ -65,6 +66,7 @@
               notify2
               pyyaml
               jsonschema
+              tqdm
               setuptools
               pytest
               mypy
@@ -79,7 +81,7 @@
             restic-in-peace
             pkgs.restic
             (python.withPackages (ps: with ps; [
-              pytest pyyaml jsonschema mypy types-pyyaml types-requests loguru requests notify2
+              pytest pyyaml jsonschema tqdm mypy types-pyyaml types-requests loguru requests notify2
             ]))
           ];
         } ''

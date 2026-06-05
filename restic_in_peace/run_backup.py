@@ -79,11 +79,27 @@ def _exceeds_size_limit(
     return True
 
 
-def _print_summary(sinks: list[IO[str]], results: list[tuple[str, str]]) -> None:
+def _print_summary(
+    sinks: list[IO[str]],
+    results: list[tuple[str, str, int | None, Path | None]],
+) -> None:
+    """Each row is (name, status, would_add_bytes_or_None, diag_path_or_None).
+    When the row is a size-limit skip and we know the diagnostic path, we
+    print the ncdu invocation right under it."""
     _tee("\n=== Summary ===\n", sinks)
-    width = max((len(name) for name, _ in results), default=0)
-    for name, status in results:
-        _tee(f"  {name:<{width}}  {status}\n", sinks)
+    name_w = max((len(n) for n, *_ in results), default=0)
+    size_w = max(
+        (len(human_numbers.to_si(b)) for _, _, b, _ in results if b is not None),
+        default=0,
+    )
+    for name, status, would_add, diag in results:
+        size_col = (
+            f"{human_numbers.to_si(would_add):>{size_w}}" if would_add is not None
+            else " " * size_w
+        )
+        _tee(f"  {name:<{name_w}}  {size_col}  {status}\n", sinks)
+        if "size-limit exceeded" in status and diag is not None:
+            _tee(f"  {' ' * name_w}  {' ' * size_w}  ncdu --apparent-size -f {diag}\n", sinks)
 
 
 def _run_fix_home(config_path: str, sinks: list[IO[str]], sudo_user: str | None = None) -> int:
@@ -147,7 +163,8 @@ def run(
 
         _tee(f"Starting backup on {datetime.now().ctime()}\n", sinks)
 
-        results: list[tuple[str, str]] = []
+        # results entry: (name, status, would_add_bytes_or_None, diag_path_or_None)
+        results: list[tuple[str, str, int | None, Path | None]] = []
 
         fix_home_failed = False
         for fix_user in fix_homes_users:
@@ -159,10 +176,10 @@ def run(
             )
             if rc != 0:
                 _tee(f"fix-home for {fix_user} exited with {rc}\n", sinks)
-                results.append((f"fix-home/{fix_user}", f"failed (exit {rc})"))
+                results.append((f"fix-home/{fix_user}", f"failed (exit {rc})", None, None))
                 fix_home_failed = True
             else:
-                results.append((f"fix-home/{fix_user}", "OK"))
+                results.append((f"fix-home/{fix_user}", "OK", None, None))
 
         if fix_home_failed:
             _tee(
@@ -197,26 +214,27 @@ def run(
                 _tee(f"diagnostic for {profile} failed: {e}\n", sinks)
                 logger.error(f"diagnostic for {profile} failed: {e}")
 
+            total_bytes = sum(asize for _, asize, _ in items)
+
             if _exceeds_size_limit(config, profile, items, ncdu_doc, diag_path, sinks):
-                results.append((profile, "size-limit exceeded; skipped"))
+                results.append((profile, "size-limit exceeded; skipped", total_bytes, diag_path))
                 continue
 
-            subcommands: list[str] = []
-            if not dry_run:
-                subcommands.append("unlock")
-            subcommands.append("backup")
+            if dry_run:
+                # The dry-run pre-pass IS the dry-run; don't re-spawn restic.
+                results.append((profile, "dry-run OK", total_bytes, diag_path))
+                continue
+
+            subcommands: list[str] = ["unlock", "backup"]
             if profile_mod.has_section(config, profile, "forget"):
                 subcommands.append("forget")
-            if not dry_run:
-                subcommands.append("check")
+            subcommands.append("check")
 
             profile_failure: tuple[str, int] | None = None
             for subcommand in subcommands:
                 settings, env_vars = profile_mod.resolve(config, profile, subcommand)
                 flags, positionals = profile_mod.to_argv(settings, subcommand)
                 cmd = ["restic", subcommand] + flags + positionals
-                if dry_run and subcommand in ("backup", "forget"):
-                    cmd.append("--dry-run")
                 proc_env = {**os.environ, **{k: str(v) for k, v in env_vars.items()}}
                 rc = _stream(cmd, sinks, env=proc_env)
                 if rc != 0:
@@ -225,14 +243,14 @@ def run(
                     break  # skip remaining subcommands for this profile
 
             if profile_failure is None:
-                results.append((profile, "OK"))
+                results.append((profile, "OK", total_bytes, diag_path))
             else:
                 sub, rc = profile_failure
-                results.append((profile, f"{sub} failed (exit {rc})"))
+                results.append((profile, f"{sub} failed (exit {rc})", total_bytes, diag_path))
 
         _print_summary(sinks, results)
 
-        failures = sum(1 for _, status in results if status != "OK")
+        failures = sum(1 for _, status, *_ in results if status != "OK" and status != "dry-run OK")
         if failures:
             _tee(f"run-backup completed with {failures} failure(s)\n", sinks)
             return 1
