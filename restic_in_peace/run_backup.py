@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -10,7 +11,7 @@ from typing import IO
 
 from . import diagnose
 from . import profile as profile_mod
-from .utils import logger
+from .utils import human_numbers, logger
 
 
 def _tee(text: str, sinks: list[IO[str]]) -> None:
@@ -33,6 +34,50 @@ def _stream(cmd: list[str], sinks: list[IO[str]], env: dict[str, str] | None = N
     for line in process.stdout:
         _tee(line, sinks)
     return process.wait()
+
+
+def _profile_size_limit(config: dict, profile: str) -> int | None:
+    """Resolve the profile and return its added-size-limit as bytes (or None)."""
+    settings, _ = profile_mod.resolve(config, profile, "backup")
+    raw = settings.get("added-size-limit")
+    if raw is None:
+        return None
+    if isinstance(raw, int):
+        return raw
+    parsed: int = human_numbers.parse(str(raw))
+    return parsed
+
+
+def _exceeds_size_limit(
+    config: dict,
+    profile: str,
+    items: list[tuple[str, int, int]],
+    ncdu_doc: list | None,
+    diag_path: Path | None,
+    sinks: list[IO[str]],
+) -> bool:
+    limit = _profile_size_limit(config, profile)
+    if limit is None or not items:
+        return False
+    total = sum(asize for _, asize, _ in items)
+    if total <= limit:
+        return False
+
+    _tee(
+        f"\nProfile {profile} would add {human_numbers.to_si(total)}, "
+        f"exceeds added-size-limit {human_numbers.to_si(limit)}. "
+        f"Skipping this profile.\n",
+        sinks,
+    )
+    if diag_path is not None:
+        _tee(f"To investigate:  ncdu --apparent-size -f {diag_path}\n", sinks)
+    if ncdu_doc is not None:
+        sigs = diagnose.significant_items(ncdu_doc)
+        if sigs:
+            _tee("Paths contributing ≥5% of the data to back up:\n", sinks)
+            for path, size in sigs:
+                _tee(f"  {human_numbers.to_si(size):>10s}  {path}\n", sinks)
+    return True
 
 
 def _print_summary(sinks: list[IO[str]], results: list[tuple[str, str]]) -> None:
@@ -121,18 +166,29 @@ def run(
         for profile in profiles:
             _tee(f"Backing up profile {profile}\n", sinks)
 
-            # Always write a per-profile ncdu diagnostic of what restic would
-            # add, before the real backup. Useful regardless of outcome (real
-            # run or --dry-run, success or size-limit abort).
+            # Dry-run pre-pass: collect (path, asize, dsize) for every file
+            # restic would add or modify, write the ncdu diagnostic, and use
+            # the same data to enforce the profile's added-size-limit. If the
+            # limit fires we skip this profile entirely — no `restic backup`
+            # is ever started, so there's no SIGINT-during-upload window.
             diag_path: Path | None = None
-            if run_dir is not None:
-                diag_path = run_dir / f"{profile}.ncdu.json"
-                _tee(f"Writing diagnostic to {diag_path}\n", sinks)
-                try:
-                    diagnose.write_diagnostic(config, profile, diag_path)
-                except Exception as e:
-                    _tee(f"diagnostic for {profile} failed: {e}\n", sinks)
-                    logger.error(f"diagnostic for {profile} failed: {e}")
+            items: list[tuple[str, int, int]] = []
+            ncdu_doc: list | None = None
+            try:
+                items = diagnose.collect_items(config, profile)
+                ncdu_doc = diagnose.build_ncdu(items)
+                if run_dir is not None:
+                    diag_path = run_dir / f"{profile}.ncdu.json"
+                    diag_path.parent.mkdir(parents=True, exist_ok=True)
+                    diag_path.write_text(json.dumps(ncdu_doc) + "\n")
+                    _tee(f"Wrote diagnostic to {diag_path}\n", sinks)
+            except Exception as e:
+                _tee(f"diagnostic for {profile} failed: {e}\n", sinks)
+                logger.error(f"diagnostic for {profile} failed: {e}")
+
+            if _exceeds_size_limit(config, profile, items, ncdu_doc, diag_path, sinks):
+                results.append((profile, "size-limit exceeded; skipped"))
+                continue
 
             subcommands: list[str] = []
             if not dry_run:

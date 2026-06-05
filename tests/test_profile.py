@@ -55,29 +55,6 @@ def test_profile_inheritance_overrides(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
 
 
-def test_profile_size_limit_aborts(
-    fake_home, restic_repo, restic_password, rip_bin, restic_bin, write_config, test_env
-):
-    (fake_home / "big.bin").write_bytes(b"x" * 10_000)
-    config = write_config({
-        "profiles": {
-            "p1": {
-                "repository": str(restic_repo),
-                "env": {"RESTIC_PASSWORD": restic_password},
-                "added-size-limit": "1KB",
-                "backup": {"source": [str(fake_home)]},
-            },
-        },
-    })
-
-    result = subprocess.run(
-        [rip_bin, "--config", str(config), "--name", "p1", "restic", "backup"],
-        capture_output=True, text=True, env=test_env,
-    )
-    assert result.returncode != 0
-    assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
-
-
 def test_forget_translates_policy_flags(
     fake_home, restic_repo, restic_password, rip_bin, restic_bin, write_config, test_env
 ):

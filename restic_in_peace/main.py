@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import signal
 import subprocess
 import sys
 import shlex
@@ -18,7 +17,6 @@ from .utils import logger
 return_codes: dict[str, int] = {
     "SKIP_CAUSE_BATTERY": -1,
     "SKIP_CAUSE_NETWORK": -2,
-    "ABORT_TOO_MUCH_DATA": -3,
     "INTERRUPTED": -4,
 }
 
@@ -96,47 +94,7 @@ def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
     return main, pre
 
 
-def get_latest_snapshot_stats(args: argparse.Namespace) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-    get_latest_snapshot_command = utils.build_restic_command(
-        "snapshots", args, additional_argparse_arguments=["tag"], force_json=True
-    )
-    process = utils.run_command(get_latest_snapshot_command)
-    try:
-        snapshots = json.loads(process.stdout)
-        if not snapshots:
-            return None, None
-    except json.JSONDecodeError:
-        logger.error("Unexpected error while parsing restic output as JSON while getting latest snapshot stats")
-        return None, None
-
-    snapshots.sort(key=lambda s: s["time"], reverse=True)
-    latest_snapshot = snapshots[0]
-
-    stats_command = utils.build_restic_command(
-        "stats", args, additional_unparsed_arguments=[latest_snapshot["id"]], force_json=True
-    )
-    process = utils.run_command(stats_command)
-    try:
-        snapshot_stats = json.loads(process.stdout)
-    except json.JSONDecodeError:
-        logger.error("Unexpected error while parsing restic output as JSON while getting latest snapshot stats")
-        return None, None
-    return latest_snapshot, snapshot_stats
-
-
 def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None:
-    latest_snapshot, latest_snapshot_stats = get_latest_snapshot_stats(args)
-    if latest_snapshot is None or latest_snapshot_stats is None:
-        latest_snapshot_size = 0
-        latest_snapshot_id = "<NONE>"
-        logger.warning(
-            f"Latest snapshot stats not found. It is normal if this is your first backup. Is the tag correct?"
-        )
-    else:
-        latest_snapshot_size = latest_snapshot_stats["total_size"]
-        latest_snapshot_id = latest_snapshot["short_id"]
-        logger.info(f"Latest snapshot {latest_snapshot_id} has size {latest_snapshot_size}")
-
     backup_command = utils.build_restic_command(
         "backup",
         args,
@@ -173,33 +131,6 @@ def run_backup(args: argparse.Namespace, unparsed_args: list[str]) -> int | None
                 logger.info(
                     f"Finished filesystem scan in {duration}s, found {data_size} bytes to backup in {total_files} files"
                 )
-                data_left_amount = max(data_size - latest_snapshot_size, 0)
-                if args.added_size_limit and data_left_amount > args.added_size_limit:
-                    message = (
-                        f"Attempting to backup {human_numbers.to_si(data_left_amount)}, "
-                        f"the limit is {human_numbers.to_si(args.added_size_limit)}, aborting!"
-                    )
-                    logger.critical(message)
-                    diag_file = os.environ.get("RIP_DIAGNOSTIC_FILE")
-                    if diag_file and os.path.exists(diag_file):
-                        logger.critical(
-                            f"To investigate:  ncdu --apparent-size -f {shlex.quote(diag_file)}"
-                        )
-                        try:
-                            from .diagnose import significant_items
-                            with open(diag_file) as f:
-                                ncdu_doc = json.load(f)
-                            sigs = significant_items(ncdu_doc)
-                        except Exception as e:
-                            logger.error(f"Could not summarize diagnostic: {e}")
-                            sigs = []
-                        if sigs:
-                            logger.critical("Paths contributing ≥5%% of the data to back up:")
-                            for path, size in sigs:
-                                logger.critical(f"  {human_numbers.to_si(size):>10s}  {path}")
-                    process.send_signal(signal.SIGINT)
-                    process.wait()
-                    raise TooMuchDataException(message)
 
             elif parsed["message_type"] == "status":
                 total_bytes = parsed.get("total_bytes", 0)
@@ -327,12 +258,6 @@ def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
                     message = f"Backup with tag {', '.join(args.tag)} failed with code {restic_returncode}"
                     urgency = utils.notifications.URGENCY_CRITICAL
 
-        except TooMuchDataException as e:
-            summary = "Backup aborted"
-            message = e.message
-            urgency = utils.notifications.URGENCY_CRITICAL
-            restic_returncode = return_codes["ABORT_TOO_MUCH_DATA"]
-            additional_data["error"] = e.message
         except KeyboardInterrupt:
             logger.error("Backup aborted due to SIGINT")
             summary = "Backup aborted"
@@ -409,10 +334,6 @@ def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
     exit(restic_returncode)
 
 
-class TooMuchDataException(Exception):
-    def __init__(self, message: str, *args: object) -> None:
-        self.message = message
-        super().__init__(message, *args)
 
 
 def entrypoint() -> None:

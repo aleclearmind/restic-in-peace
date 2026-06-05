@@ -119,6 +119,41 @@ def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
 
 
+def test_size_limit_skips_profile_in_run_backup(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    # Big source + 1KB limit → diagnostic pre-pass sees too much, profile is
+    # skipped, no restic backup is ever invoked, no snapshot lands.
+    (fake_home / "big.bin").write_bytes(b"x" * 50_000)
+    log_dir = tmp_path / "logs"
+    config = write_config({
+        "run-backup": {"log-path": str(log_dir)},
+        "profiles": {
+            "common": {
+                "repository": str(restic_repo),
+                "env": {"RESTIC_PASSWORD": restic_password},
+                "added-size-limit": "1KB",
+            },
+            "p1": {
+                "inherit": "common",
+                "backup": {"source": [str(fake_home)]},
+            },
+        },
+    })
+
+    result = subprocess.run(
+        [rip_bin, "run-backup", str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode != 0  # summary reports a failure row
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 0
+    run_dir = next(iter(log_dir.iterdir()))
+    log = (run_dir / "backup.log").read_text()
+    assert "exceeds added-size-limit" in log
+    assert "ncdu --apparent-size -f" in log
+    assert "size-limit exceeded" in log
+
+
 def test_only_filters_profiles_by_name(
     fake_home, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):
