@@ -155,6 +155,36 @@ def test_size_limit_skips_profile_in_run_backup(
     assert "size-limit exceeded" in log
 
 
+def test_ignore_added_size_limit_bypasses_the_gate(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    # Same setup as test_size_limit_skips_profile_in_run_backup, but
+    # --ignore-added-size-limit lets the profile through.
+    (fake_home / "big.bin").write_bytes(b"x" * 50_000)
+    log_dir = tmp_path / "logs"
+    config = write_config({
+        "added-size-limit": "1KB",
+        "log-path": str(log_dir),
+        "profiles": {
+            "common": {
+                "repository": str(restic_repo),
+                "env": {"RESTIC_PASSWORD": restic_password},
+            },
+            "p1": {
+                "inherit": "common",
+                "backup": {"source": [str(fake_home)]},
+            },
+        },
+    })
+
+    result = subprocess.run(
+        [rip_bin, "run-backup", "--ignore-added-size-limit", str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+
+
 def test_only_filters_profiles_by_name(
     fake_home, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):

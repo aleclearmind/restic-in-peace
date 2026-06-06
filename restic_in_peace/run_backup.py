@@ -114,6 +114,9 @@ def run(
     dry_run: bool = False,
     log_path: str | None = None,
     only: list[str] | None = None,
+    ignore_skip_on_battery: bool = False,
+    ignore_added_size_limit: bool = False,
+    ignore_wifi_whitelist: bool = False,
 ) -> int:
     config_path = os.path.abspath(config_path)
     try:
@@ -123,12 +126,14 @@ def run(
         return 1
 
     rip = profile_mod.rip_settings(config)
-    if not battery.battery_ok(bool(rip.get("skip-on-battery", False))):
+    skip_on_battery = bool(rip.get("skip-on-battery", False)) and not ignore_skip_on_battery
+    if not battery.battery_ok(skip_on_battery):
         logger.error("On battery power; skipping the whole run.")
         return 1
+    whitelist = [] if ignore_wifi_whitelist else rip.get("wifi-whitelist", [])
     if not network.network_ok(
         blacklist=rip.get("wifi-blacklist", []),
-        whitelist=rip.get("wifi-whitelist", []),
+        whitelist=whitelist,
     ):
         logger.error("Network conditions don't allow backup; skipping the whole run.")
         return 1
@@ -216,7 +221,9 @@ def run(
 
             total_bytes = sum(asize for _, asize, _ in items)
 
-            if _exceeds_size_limit(config, profile, items, ncdu_doc, diag_path, sinks):
+            if not ignore_added_size_limit and _exceeds_size_limit(
+                config, profile, items, ncdu_doc, diag_path, sinks,
+            ):
                 results.append((profile, "size-limit exceeded; skipped", total_bytes, diag_path))
                 continue
 

@@ -80,6 +80,15 @@ def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
         help="directory where the dated <run> subdir goes (overrides run-backup.log-path)")
     run_backup_p.add_argument("--only", action="append", default=[], metavar="PROFILE",
         help="only back up profiles with these names; can be repeated")
+    run_backup_p.add_argument("--ignore-skip-on-battery", action="store_true",
+        dest="ignore_skip_on_battery",
+        help="bypass the battery gate (run even on battery power)")
+    run_backup_p.add_argument("--ignore-added-size-limit", action="store_true",
+        dest="ignore_added_size_limit",
+        help="bypass the added-size-limit gate per profile")
+    run_backup_p.add_argument("--ignore-wifi-whitelist", action="store_true",
+        dest="ignore_wifi_whitelist",
+        help="bypass the wifi-whitelist gate (wifi-blacklist still applies)")
     run_backup_p.add_argument("config", help="config file")
 
     collect = subparsers.add_parser("collect-non-backuped-files",
@@ -212,7 +221,13 @@ def main(args: argparse.Namespace, unparsed_args: list[str]) -> None:
     if args.command == "run-backup":
         from .run_backup import run as run_backup_run
         exit(run_backup_run(
-            args.config, dry_run=args.dry_run, log_path=args.log_path, only=args.only,
+            args.config,
+            dry_run=args.dry_run,
+            log_path=args.log_path,
+            only=args.only,
+            ignore_skip_on_battery=args.ignore_skip_on_battery,
+            ignore_added_size_limit=args.ignore_added_size_limit,
+            ignore_wifi_whitelist=args.ignore_wifi_whitelist,
         ))
 
     if args.command == "collect-non-backuped-files":
