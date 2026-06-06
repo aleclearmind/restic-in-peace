@@ -38,6 +38,8 @@ def _build_parsers() -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
 
     restic = subparsers.add_parser("restic",
         help="run a restic command; `backup` goes through rip's gates and notifications")
+    restic.add_argument("restic_subcommand",
+        help="restic subcommand (backup, snapshots, restore, mount, ...)")
     restic.add_argument("--added-size-limit", type=human_numbers.parse,
         help="abort backup if restic would add more than this many bytes")
     restic.add_argument("--wifi-whitelist", action="append", default=[],
@@ -356,6 +358,8 @@ def entrypoint() -> None:
     pre_args, argv = pre_parser.parse_known_args(sys.argv[1:])
     config_path, profile_name = pre_args.config, pre_args.name
 
+    forward_to_restic: list[str] = []
+
     if config_path or profile_name:
         if not (config_path and profile_name):
             sys.stderr.write("--config and --name must be supplied together\n")
@@ -382,28 +386,34 @@ def entrypoint() -> None:
         for k, v in env.items():
             os.environ.setdefault(k, str(v))
 
-        # Profile flags first (parsed by argparser), then any CLI flags / args
-        # the user passed (which override on non-list flags), then positional
-        # sources at the end.
-        argv = ["restic", restic_subcmd] + flags + cli_rest + positionals
+        # CLI sanity check: parse just the user-typed portion. If argparse
+        # leaves anything over, the user typed an unknown flag/positional we
+        # would otherwise silently forward to restic — refuse instead.
+        _, cli_extras = argparser.parse_known_args(["restic", restic_subcmd, *cli_rest])
+        if cli_extras:
+            sys.stderr.write(f"unknown argument(s) for restic: {' '.join(cli_extras)}\n")
+            sys.exit(2)
 
-    arguments, remaining = argparser.parse_known_args(argv)
+        # Full parse: profile flags + CLI flags + profile positionals. The
+        # `remaining` here is purely profile-derived (CLI was just verified
+        # to be clean) so it's safe to forward to restic.
+        arguments, remaining = argparser.parse_known_args(
+            ["restic", restic_subcmd, *flags, *cli_rest, *positionals],
+        )
+        forward_to_restic = remaining
+    else:
+        arguments, remaining = argparser.parse_known_args(argv)
+        if remaining:
+            sys.stderr.write(
+                f"unknown argument(s) for {arguments.command}: {' '.join(remaining)}\n"
+            )
+            sys.exit(2)
+
     utils.logging.set_level(arguments.loglevel)
 
-    # Only the `restic` subparser permits unknown trailing args (they are the
-    # restic subcommand + restic flags we forward unchanged). Every other rip
-    # subcommand has a closed-set of flags; complain instead of silently
-    # accepting typos like `run-backup --ignore-size-limit`.
+    # Promote the restic subcommand into args.command so the existing dispatch
+    # (backup pipeline vs passthrough) keeps working.
     if arguments.command == "restic":
-        if not remaining:
-            sys.stderr.write("`restic` requires a subcommand\n")
-            sys.exit(2)
-        arguments.command = remaining[0]
-        remaining = remaining[1:]
-    elif remaining:
-        sys.stderr.write(
-            f"unknown argument(s) for {arguments.command}: {' '.join(remaining)}\n"
-        )
-        sys.exit(2)
+        arguments.command = arguments.restic_subcommand
 
-    main(arguments, remaining)
+    main(arguments, forward_to_restic)
