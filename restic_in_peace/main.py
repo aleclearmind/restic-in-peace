@@ -390,14 +390,20 @@ def entrypoint() -> None:
     arguments, remaining = argparser.parse_known_args(argv)
     utils.logging.set_level(arguments.loglevel)
 
-    # If the user invoked `restic <subcmd>`, the actual restic subcommand sits
-    # as the first remaining positional. Promote it to args.command so the
-    # existing dispatch (backup pipeline vs passthrough) keeps working.
+    # Only the `restic` subparser permits unknown trailing args (they are the
+    # restic subcommand + restic flags we forward unchanged). Every other rip
+    # subcommand has a closed-set of flags; complain instead of silently
+    # accepting typos like `run-backup --ignore-size-limit`.
     if arguments.command == "restic":
         if not remaining:
             sys.stderr.write("`restic` requires a subcommand\n")
             sys.exit(2)
         arguments.command = remaining[0]
         remaining = remaining[1:]
+    elif remaining:
+        sys.stderr.write(
+            f"unknown argument(s) for {arguments.command}: {' '.join(remaining)}\n"
+        )
+        sys.exit(2)
 
     main(arguments, remaining)

@@ -155,6 +155,25 @@ def test_size_limit_skips_profile_in_run_backup(
     assert "size-limit exceeded" in log
 
 
+def test_unknown_run_backup_flag_rejected(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, write_config, test_env
+):
+    # Typos like --ignore-size-limit (missing "added-") used to be silently
+    # accepted because parse_known_args swallowed them. They should error now.
+    config = write_config({
+        "profiles": {
+            "common": {"repository": str(restic_repo), "env": {"RESTIC_PASSWORD": restic_password}},
+            "p1": {"inherit": "common", "backup": {"source": [str(fake_home)]}},
+        },
+    })
+    result = subprocess.run(
+        [rip_bin, "run-backup", "--ignore-size-limit", str(config)],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert result.returncode != 0
+    assert "--ignore-size-limit" in (result.stdout + result.stderr)
+
+
 def test_ignore_added_size_limit_bypasses_the_gate(
     fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):
