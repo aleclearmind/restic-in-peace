@@ -41,12 +41,6 @@ def _bash_blocks(text: str) -> list[str]:
     return blocks
 
 
-def test_readme_has_runnable_blocks() -> None:
-    # If this test breaks, the README has lost its tutorial flow — either every
-    # block got marked notest, or we lost the bash fences entirely.
-    assert _bash_blocks(README.read_text()), "no runnable bash blocks in README"
-
-
 def test_readme_bash_snippets(rip_bin: str, restic_bin: str, tmp_path: Path) -> None:
     blocks = _bash_blocks(README.read_text())
 

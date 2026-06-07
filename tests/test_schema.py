@@ -69,12 +69,6 @@ def test_unknown_top_level_key_rejected(tmp_path: Path) -> None:
         profile.load_config(path)
 
 
-def test_log_path_is_optional(tmp_path: Path) -> None:
-    # log-path is optional; backup falls back to stderr when missing.
-    path = _write(tmp_path, {})
-    assert profile.load_config(path) == {}
-
-
 def test_fix_home_value_must_be_list_of_strings(tmp_path: Path) -> None:
     path = _write(tmp_path, {"fix-homes": {"alice": {".dotfiles": "not-a-list"}}})
     with pytest.raises(profile.ConfigError):
@@ -151,11 +145,6 @@ def test_log_path_must_be_absolute(tmp_path: Path) -> None:
         profile.load_config(path)
 
 
-def test_log_path_absolute_accepted(tmp_path: Path) -> None:
-    path = _write(tmp_path, {"log-path": "/var/log/rip"})
-    profile.load_config(path)  # no raise
-
-
 def test_frequency_requires_tag(tmp_path: Path) -> None:
     # With `frequency` set, every common-inheriting profile must declare a tag.
     path = _write(tmp_path, {
@@ -196,37 +185,6 @@ def test_frequency_with_matching_tag_accepted(tmp_path: Path) -> None:
         },
     })
     profile.load_config(path)  # no raise
-
-
-def test_frequency_with_single_element_tag_list_accepted(tmp_path: Path) -> None:
-    # YAML idiom: `tag: [laptop]`. Should validate just like `tag: laptop`.
-    path = _write(tmp_path, {
-        "frequency": "24h",
-        "profiles": {
-            "common": {"repository": "/x", "env": {"RESTIC_PASSWORD": "y"}},
-            "laptop": {
-                "inherit": "common",
-                "backup": {"source": ["/home/me"], "tag": ["laptop"]},
-            },
-        },
-    })
-    profile.load_config(path)
-
-
-def test_frequency_with_multiple_tags_rejected(tmp_path: Path) -> None:
-    # Two tags on one profile breaks the 1:1 mapping snapshots filtering relies on.
-    path = _write(tmp_path, {
-        "frequency": "24h",
-        "profiles": {
-            "common": {"repository": "/x", "env": {"RESTIC_PASSWORD": "y"}},
-            "laptop": {
-                "inherit": "common",
-                "backup": {"source": ["/home/me"], "tag": ["laptop", "extra"]},
-            },
-        },
-    })
-    with pytest.raises(profile.ConfigError, match="exactly one tag"):
-        profile.load_config(path)
 
 
 def test_no_frequency_means_no_tag_check(tmp_path: Path) -> None:

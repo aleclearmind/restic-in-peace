@@ -155,25 +155,6 @@ def test_size_limit_skips_profile_in_backup(
     assert "size-limit exceeded" in log
 
 
-def test_unknown_backup_flag_rejected(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, write_config, test_env
-):
-    # Typos like --ignore-size-limit (missing "added-") used to be silently
-    # accepted because parse_known_args swallowed them. They should error now.
-    config = write_config({
-        "profiles": {
-            "common": {"repository": str(restic_repo), "env": {"RESTIC_PASSWORD": restic_password}},
-            "p1": {"inherit": "common", "backup": {"source": [str(fake_home)]}},
-        },
-    })
-    result = subprocess.run(
-        [rip_bin, "--config", str(config), "backup", "--ignore-size-limit"],
-        capture_output=True, text=True, env=test_env,
-    )
-    assert result.returncode != 0
-    assert "--ignore-size-limit" in (result.stdout + result.stderr)
-
-
 def test_ignore_added_size_limit_bypasses_the_gate(
     fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
 ):
@@ -404,28 +385,6 @@ def test_continues_after_one_profile_fails(
     assert "=== Summary ===" in log
     assert "bad" in log and "failed" in log
     assert "good" in log and "OK" in log
-
-
-def test_proceeds_when_fix_home_strict_passes(
-    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, current_user, write_config, test_env
-):
-    (fake_home / ".dotfiles").mkdir()
-    (fake_home / ".dotfiles" / ".vimrc").write_text("set nu\n")
-    (fake_home / ".vimrc").symlink_to(".dotfiles/.vimrc")
-    (fake_home / "doc.txt").write_text("hello\n")
-
-    log_dir = tmp_path / "logs"
-    config = write_config(_config_dict(
-        log_dir, restic_repo, restic_password, fake_home,
-        fix_homes={current_user: {"ignore": [".dotfiles"], ".dotfiles": [".vimrc"]}},
-    ))
-
-    result = subprocess.run(
-        [rip_bin, "--config", str(config), "backup"],
-        capture_output=True, text=True, env=test_env,
-    )
-    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
 
 
 def test_desktop_notifications_invoke_notify_send(

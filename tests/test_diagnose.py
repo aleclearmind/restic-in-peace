@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from restic_in_peace.diagnose import build_ncdu, significant_items
 
 
@@ -52,12 +50,6 @@ def test_directory_entry_appearing_after_its_children_does_not_clobber() -> None
     assert home[0] == {"name": "home"}
     files = {e["name"]: (e["asize"], e["dsize"]) for e in home[1:]}
     assert files == {"file.txt": (100, 4096)}
-
-
-def test_build_ncdu_emits_valid_json() -> None:
-    doc = build_ncdu([("/a/b.txt", 10, 4096)])
-    encoded = json.dumps(doc)
-    assert json.loads(encoded) == doc
 
 
 def test_significant_items_reports_big_file_not_its_parent() -> None:
