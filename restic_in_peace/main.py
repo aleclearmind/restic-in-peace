@@ -59,6 +59,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="list files present on disk that no common-inheriting profile would back up")
     collect.add_argument("output_dir", help="output directory")
 
+    install_timer = subparsers.add_parser("install-timer",
+        help="render systemd service+timer units for `rip backup` and write them to disk")
+    install_timer.add_argument("--schedule", default="hourly",
+        help="systemd OnCalendar value (default: hourly)")
+    install_timer.add_argument("--unit-dir", dest="unit_dir", metavar="DIR",
+        help="directory to write units to (default: ~/.config/systemd/user, "
+             "or /etc/systemd/system with --system)")
+    install_timer.add_argument("--name", default="rip-backup",
+        help="basename for the unit pair (default: rip-backup)")
+    install_timer.add_argument("--system", action="store_true",
+        help="write to /etc/systemd/system instead of the per-user dir; "
+             "intended for a root-owned timer")
+    install_timer.add_argument("--enable", action="store_true",
+        help="after writing, run `systemctl daemon-reload` and "
+             "`systemctl enable --now <name>.timer`")
+
     return main
 
 
@@ -85,6 +101,17 @@ def main(arguments: argparse.Namespace, restic_extras: list[str]) -> int:
     if arguments.command == "collect-non-backuped-files":
         from .collect import run as collect_run
         return collect_run(config_path, arguments.output_dir)
+
+    if arguments.command == "install-timer":
+        from .install_timer import run as install_timer_run
+        return install_timer_run(
+            config=arguments.config,
+            schedule=arguments.schedule,
+            unit_dir=arguments.unit_dir,
+            name=arguments.name,
+            system=arguments.system,
+            enable=arguments.enable,
+        )
 
     # arguments.command == "restic": dispatch to the named restic subcommand
     # under the named profile.
