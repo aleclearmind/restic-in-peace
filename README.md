@@ -46,7 +46,19 @@ pip install git+https://github.com/aleclearmind/restic-in-peace
 
 ## The `rip.yml` file
 
-`rip` reads its configuration from `./rip.yml` by default; override with `--config <path>`. The configuration is mostly a mirror of restic's flags: any key inside a profile becomes the corresponding `--key value` flag. `rip`-specific keys live at the top level.
+`rip` reads its configuration from `./rip.yml` by default; override with `--config <path>`. The conventional location for a personal install is `~/.config/restic-in-peace/rip.yml`. The configuration is mostly a mirror of restic's flags: any key inside a profile becomes the corresponding `--key value` flag. `rip`-specific keys live at the top level.
+
+The config file is intended to be self-contained — including the repository password under `profiles.common.env.RESTIC_PASSWORD` — so it needs to be locked down. Generate a strong password, write it into `rip.yml`, then tighten the permissions:
+
+```bash
+head -c 16 /dev/urandom | base64 | tr -d '='
+```
+
+```bash notest
+chmod 600 ~/.config/restic-in-peace/rip.yml
+```
+
+**Save the password somewhere off the machine too** (a password manager, or printed and locked away). If the laptop dies and you only have the password inside the laptop's backup, you can't decrypt the backup.
 
 ### Anatomy
 
@@ -99,6 +111,12 @@ fix-homes:
 ```
 
 `profiles.<name>.<key>` becomes a top-level restic flag; `profiles.<name>.<command>.<key>` (under e.g. `backup:` or `forget:`) is scoped to that restic subcommand and overrides the profile defaults when that subcommand runs. `env:` is merged into the subprocess environment — that's how `RESTIC_PASSWORD` gets to restic. List-valued flags (`source`, `tag`, `exclude`, ...) expand to repeated `--key value` pairs.
+
+A few keys are worth calling out:
+
+- **`repository`** can be a local path, an SFTP URL, or any of the many backends restic supports — see [the restic backend list](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html). On a managed deployment your sysadmin will hand you the URL to set under `profiles.common.repository`.
+- **`tag`** must be unique per profile. `rip` uses it to find the previous snapshot when computing the size-delta for `added-size-limit`; two profiles sharing a tag will compare against each other's snapshots and give nonsensical numbers.
+- **`source`**, **`exclude`**, **`iexclude`** (case-insensitive exclude), and **`exclude-if-present`** (skip a directory containing one of the named marker files, e.g. `.do_not_backup` or `CACHEDIR.TAG`) are the four knobs that decide *what* gets backed up. Prefer naming a broad `source` (e.g. `/home/<user>`) and excluding the noise: when in doubt, err on backing up too much rather than missing something important.
 
 ### Top-level `rip` keys
 
@@ -165,6 +183,10 @@ rip --config $RIP_TMP/rip.yml backup
 ```
 
 You should now have a snapshot in the repo. A second `rip backup` would be incremental and produce a second snapshot.
+
+> **First-time gotcha.** On a freshly-initialized repository the pre-pass sees *every* file as new, which usually trips `added-size-limit` and the run aborts on the very first invocation. Either set `added-size-limit: 0` to disable the watchdog while you bootstrap, or run the first backup with `rip backup --ignore-added-size-limit`. Subsequent runs only see the delta from the previous snapshot and will fit under the limit.
+
+The `restic check` at the end is run *after every backup* — it should never fail. If it does, something corrupted the repo (disk error, interrupted operation that left torn data); investigate before the next run.
 
 ### Useful flags
 
@@ -309,4 +331,4 @@ rm -rf $RIP_TMP
 
 ## Automating with systemd
 
-See `configure_laptop.md` for the user-level systemd timer setup. (That section is still on the previous CLI vocabulary and will be revisited.)
+Documentation for the user-level systemd timer that drives `rip backup` daily is being rewritten and will land in a follow-up.
