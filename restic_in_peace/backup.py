@@ -123,7 +123,7 @@ def _print_summary(
 def _run_fix_home(config_path: str, sinks: list[IO[str]], sudo_user: str | None = None) -> int:
     """Verify that no fix-home action is pending for `sudo_user` (or the current user)."""
     prefix = ["sudo", "-Hu", sudo_user] if sudo_user else []
-    cmd = prefix + ["restic-in-peace", "--config", config_path, "fix-home", "--strict"]
+    cmd = prefix + ["rip", "--config", config_path, "fix-home", "--strict"]
     return _stream(cmd, sinks)
 
 
@@ -210,7 +210,7 @@ def run(
         if fix_home_failed:
             _tee(
                 "\nAborting: fix-home reported pending actions; not running any backup.\n"
-                "Fix the home layout (or run `restic-in-peace fix-home <config> | bash`) and re-run.\n",
+                "Fix the home layout (or run `rip fix-home | bash`) and re-run.\n",
                 sinks,
             )
             _print_summary(sinks, results)

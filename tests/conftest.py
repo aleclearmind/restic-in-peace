@@ -41,7 +41,7 @@ def restic_bin() -> str:
 
 @pytest.fixture(scope="session")
 def rip_bin() -> str:
-    return _which("restic-in-peace", "RIP_BIN")
+    return _which("rip", "RIP_BIN")
 
 
 @pytest.fixture(scope="session")
@@ -98,7 +98,7 @@ def test_env_with_password(test_env: dict[str, str], restic_password: str) -> di
 @pytest.fixture
 def write_config(tmp_path: Path) -> Callable[[dict[str, Any]], Path]:
     def _write(config: dict[str, Any]) -> Path:
-        path = tmp_path / "rip.yaml"
+        path = tmp_path / "rip.yml"
         path.write_text(yaml.safe_dump(config, default_flow_style=False))
         return path
 

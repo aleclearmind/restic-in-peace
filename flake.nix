@@ -30,7 +30,7 @@
           nativeBuildInputs = [ pkgs.makeWrapper pkgs.restic ];
 
           postFixup = ''
-            wrapProgram $out/bin/restic-in-peace \
+            wrapProgram $out/bin/rip \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.restic ]}
           '';
 
@@ -39,7 +39,7 @@
           meta = with pkgs.lib; {
             description = "Restic wrapper implementing missing features needed by rev.ng";
             homepage = "https://rev.ng/gitlab/fcremo/restic-in-peace";
-            mainProgram = "restic-in-peace";
+            mainProgram = "rip";
             platforms = platforms.unix;
           };
         };
@@ -51,7 +51,7 @@
 
         apps.default = {
           type = "app";
-          program = "${restic-in-peace}/bin/restic-in-peace";
+          program = "${restic-in-peace}/bin/rip";
         };
 
         devShells.default = pkgs.mkShell {
@@ -87,6 +87,7 @@
           cp -r ${./tests} ./tests
           cp -r ${./scripts} ./scripts
           cp ${./pyproject.toml} ./pyproject.toml
+          cp ${./README.md} ./README.md
           chmod -R u+w ./restic_in_peace
           mypy
           pytest ./tests -v

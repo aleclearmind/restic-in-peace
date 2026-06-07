@@ -10,7 +10,7 @@ from restic_in_peace import profile
 
 
 def _write(tmp_path: Path, config: Any) -> str:
-    path = tmp_path / "rip.yaml"
+    path = tmp_path / "rip.yml"
     path.write_text(yaml.safe_dump(config))
     return str(path)
 
@@ -58,7 +58,7 @@ def test_unknown_top_level_rip_key_rejected(tmp_path: Path) -> None:
 
 
 def test_empty_file_validates(tmp_path: Path) -> None:
-    path = tmp_path / "rip.yaml"
+    path = tmp_path / "rip.yml"
     path.write_text("")
     assert profile.load_config(str(path)) == {}
 
@@ -94,7 +94,7 @@ def test_skip_on_battery_must_be_bool(tmp_path: Path) -> None:
 
 
 def test_invalid_yaml_raises_config_error(tmp_path: Path) -> None:
-    path = tmp_path / "rip.yaml"
+    path = tmp_path / "rip.yml"
     path.write_text("not: valid: yaml: [")
     with pytest.raises(profile.ConfigError, match="YAML"):
         profile.load_config(str(path))
@@ -102,7 +102,7 @@ def test_invalid_yaml_raises_config_error(tmp_path: Path) -> None:
 
 def test_missing_file_raises_config_error(tmp_path: Path) -> None:
     with pytest.raises(profile.ConfigError, match="not found"):
-        profile.load_config(str(tmp_path / "missing.yaml"))
+        profile.load_config(str(tmp_path / "missing.yml"))
 
 
 def test_resticprofile_retention_section_rejected(tmp_path: Path) -> None:
@@ -140,6 +140,6 @@ def test_resolve_drops_stray_subsection_even_if_schema_permissive() -> None:
 def test_rip_sample_yaml_validates() -> None:
     # The shipped sample must validate, otherwise it lies about the schema.
     here = Path(__file__).resolve().parents[1]
-    sample = here / "rip.sample.yaml"
+    sample = here / "rip.sample.yml"
     if sample.exists():
         profile.load_config(str(sample))

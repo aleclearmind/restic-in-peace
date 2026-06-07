@@ -57,6 +57,6 @@ setup(
     zip_safe=False,
     install_requires=requirements,
     extras_require={"test": ["pytest"]},
-    entry_points={"console_scripts": ["restic-in-peace=restic_in_peace.main:entrypoint"]},
+    entry_points={"console_scripts": ["rip=restic_in_peace.main:entrypoint"]},
     cmdclass={"build_py": build_py_with_restic_flags},
 )

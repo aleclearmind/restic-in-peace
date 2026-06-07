@@ -11,9 +11,9 @@ from .utils import log
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    main = argparse.ArgumentParser(prog="restic-in-peace", description=description)
-    main.add_argument("-c", "--config", default="rip.yaml", metavar="FILE",
-        help="path to the rip config file (default: rip.yaml in CWD)")
+    main = argparse.ArgumentParser(prog="rip", description=description)
+    main.add_argument("-c", "--config", default="rip.yml", metavar="FILE",
+        help="path to the rip config file (default: rip.yml in CWD)")
 
     subparsers = main.add_subparsers(dest="command", required=True, metavar="<subcommand>")
 
