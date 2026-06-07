@@ -19,7 +19,6 @@
           format = "setuptools";
 
           propagatedBuildInputs = with python.pkgs; [
-            loguru
             requests
             pyyaml
             jsonschema
@@ -60,7 +59,6 @@
             restic-in-peace
             pkgs.restic
             (python.withPackages (ps: with ps; [
-              loguru
               requests
               pyyaml
               jsonschema
@@ -79,7 +77,7 @@
             restic-in-peace
             pkgs.restic
             (python.withPackages (ps: with ps; [
-              pytest pyyaml jsonschema tqdm mypy types-pyyaml types-requests loguru requests
+              pytest pyyaml jsonschema tqdm mypy types-pyyaml types-requests requests
             ]))
           ];
         } ''

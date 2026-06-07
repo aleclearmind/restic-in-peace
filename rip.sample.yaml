@@ -4,6 +4,7 @@ wifi-whitelist:
   - whitelisted-network
 wifi-blacklist:
   - blacklisted-network
+desktop-notifications: true
 
 profiles:
   common:

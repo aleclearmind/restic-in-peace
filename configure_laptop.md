@@ -91,6 +91,9 @@ These parameters are added by restic-in-peace:
   wifi network not matching one of the provided regexes
 * `wifi-blacklist`: abort the backup if the computer is routed through a
   wifi network matching one of the provided regexes
+* `desktop-notifications`: if true, the `backup` orchestrator fires
+  `notify-send` notifications at run-start, run-finish, and on each
+  per-profile failure
 
 Read `restic-in-peace --help` for more details. Settings can be placed
 under a command-specific subsection (e.g. `backup`, `check`) to scope them

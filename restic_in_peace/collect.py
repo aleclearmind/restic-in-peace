@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from . import profile as profile_mod
-from .utils import logger
+from .utils import log
 
 
 # Top-level paths skipped when walking from /. Override the walk root entirely
@@ -84,7 +84,7 @@ def run(config_path: str, output_dir: str) -> int:
     try:
         config = profile_mod.load_config(config_path)
     except profile_mod.ConfigError as e:
-        logger.error(str(e))
+        log(str(e))
         return 1
     profiles = profile_mod.children_of(config, "common")
 
@@ -92,7 +92,7 @@ def run(config_path: str, output_dir: str) -> int:
     log_files: list[Path] = []
 
     for profile in profiles:
-        logger.info(f"Collecting files backed up by {profile}")
+        log(f"Collecting files backed up by {profile}")
 
         unlock_cmd, env = profile_mod.build_command(config, profile, "unlock")
         _run_restic(unlock_cmd, env, capture_output=True)
@@ -119,7 +119,7 @@ def run(config_path: str, output_dir: str) -> int:
     (out_dir / "all-backuped-files").write_text("\n".join(sorted(backed_up)) + "\n")
 
     roots = _walk_roots()
-    logger.info(f"Collecting all files in {[str(r) for r in roots]}")
+    log(f"Collecting all files in {[str(r) for r in roots]}")
     all_files = _collect_files(roots)
     (out_dir / "all-files").write_text("\n".join(sorted(all_files)) + "\n")
 
@@ -141,5 +141,5 @@ def run(config_path: str, output_dir: str) -> int:
         size = summary.get("data_added_packed", 0)
         print(f"{log_path}: {size // (1024**3)} GB")
 
-    logger.info("All done")
+    log("All done")
     return 0

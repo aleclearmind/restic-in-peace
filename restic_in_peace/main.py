@@ -7,16 +7,13 @@ import sys
 
 from . import description
 from . import profile as profile_mod
-from . import utils
-from .utils import logger
+from .utils import log
 
 
 def _build_parser() -> argparse.ArgumentParser:
     main = argparse.ArgumentParser(prog="restic-in-peace", description=description)
     main.add_argument("-c", "--config", default="rip.yaml", metavar="FILE",
         help="path to the rip config file (default: rip.yaml in CWD)")
-    main.add_argument("--loglevel", default="INFO",
-        help="Log level (TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
     subparsers = main.add_subparsers(dest="command", required=True, metavar="<subcommand>")
 
@@ -31,22 +28,22 @@ def _build_parser() -> argparse.ArgumentParser:
         sp.add_argument("profile",
             help="profile name within --config")
 
-    run_backup_p = subparsers.add_parser("run-backup",
+    backup_p = subparsers.add_parser("backup",
         help="orchestrate fix-home + unlock + backup + forget + check for every "
              "profile inheriting from common; write per-profile ncdu diagnostic")
-    run_backup_p.add_argument("--dry-run", action="store_true", dest="dry_run",
+    backup_p.add_argument("--dry-run", action="store_true", dest="dry_run",
         help="skip unlock and check, pass --dry-run to backup and forget")
-    run_backup_p.add_argument("--log-path", dest="log_path", metavar="DIR",
+    backup_p.add_argument("--log-path", dest="log_path", metavar="DIR",
         help="directory where the dated <run> subdir goes (overrides log-path in config)")
-    run_backup_p.add_argument("--only", action="append", default=[], metavar="PROFILE",
+    backup_p.add_argument("--only", action="append", default=[], metavar="PROFILE",
         help="only back up profiles with these names; can be repeated")
-    run_backup_p.add_argument("--ignore-skip-on-battery", action="store_true",
+    backup_p.add_argument("--ignore-skip-on-battery", action="store_true",
         dest="ignore_skip_on_battery",
         help="bypass the battery gate (run even on battery power)")
-    run_backup_p.add_argument("--ignore-added-size-limit", action="store_true",
+    backup_p.add_argument("--ignore-added-size-limit", action="store_true",
         dest="ignore_added_size_limit",
         help="bypass the added-size-limit gate per profile")
-    run_backup_p.add_argument("--ignore-wifi-whitelist", action="store_true",
+    backup_p.add_argument("--ignore-wifi-whitelist", action="store_true",
         dest="ignore_wifi_whitelist",
         help="bypass the wifi-whitelist gate (wifi-blacklist still applies)")
 
@@ -69,9 +66,9 @@ def main(arguments: argparse.Namespace, restic_extras: list[str]) -> int:
         from .fix_home import run as fix_home_run
         return fix_home_run(config_path, strict=arguments.strict)
 
-    if arguments.command == "run-backup":
-        from .run_backup import run as run_backup_run
-        return run_backup_run(
+    if arguments.command == "backup":
+        from .backup import run as backup_run
+        return backup_run(
             config_path,
             dry_run=arguments.dry_run,
             log_path=arguments.log_path,
@@ -93,7 +90,7 @@ def main(arguments: argparse.Namespace, restic_extras: list[str]) -> int:
             config, arguments.profile, arguments.restic_subcommand,
         )
     except (KeyError, ValueError, profile_mod.ConfigError) as e:
-        logger.error(str(e))
+        log(str(e))
         return 1
 
     argv.extend(restic_extras)
@@ -108,5 +105,4 @@ def entrypoint() -> None:
     if arguments.command != "restic" and extras:
         parser.error(f"unknown argument(s): {' '.join(extras)}")
 
-    utils.logging.set_level(arguments.loglevel)
     sys.exit(main(arguments, extras))

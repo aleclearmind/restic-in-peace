@@ -41,6 +41,7 @@ _RIP_PROPERTIES: dict[str, dict[str, Any]] = {
     "skip-on-battery": {"type": "boolean"},
     "wifi-whitelist": {"type": "array", "items": {"type": "string"}},
     "wifi-blacklist": {"type": "array", "items": {"type": "string"}},
+    "desktop-notifications": {"type": "boolean"},
 }
 
 

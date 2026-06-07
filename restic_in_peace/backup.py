@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from contextlib import ExitStack
@@ -11,7 +12,24 @@ from typing import IO
 
 from . import diagnose
 from . import profile as profile_mod
-from .utils import battery, human_numbers, logger, network
+from .utils import battery, human_numbers, log, network
+
+
+def _notify(enabled: bool, summary: str, body: str = "", urgent: bool = False) -> None:
+    """Fire a notify-send notification when `enabled`. Silent if notify-send
+    isn't on PATH or fails — notifications are best-effort."""
+    if not enabled or shutil.which("notify-send") is None:
+        return
+    cmd = ["notify-send", "--app-name=restic-in-peace"]
+    if urgent:
+        cmd.append("--urgency=critical")
+    cmd.append(summary)
+    if body:
+        cmd.append(body)
+    try:
+        subprocess.run(cmd, check=False)
+    except OSError:
+        pass
 
 
 def _tee(text: str, sinks: list[IO[str]]) -> None:
@@ -122,20 +140,21 @@ def run(
     try:
         config = profile_mod.load_config(config_path)
     except profile_mod.ConfigError as e:
-        logger.error(str(e))
+        log(str(e))
         return 1
 
     rip = profile_mod.rip_settings(config)
+    notify_on = bool(rip.get("desktop-notifications", False))
     skip_on_battery = bool(rip.get("skip-on-battery", False)) and not ignore_skip_on_battery
     if not battery.battery_ok(skip_on_battery):
-        logger.error("On battery power; skipping the whole run.")
+        log("On battery power; skipping the whole run.")
         return 1
     whitelist = [] if ignore_wifi_whitelist else rip.get("wifi-whitelist", [])
     if not network.network_ok(
         blacklist=rip.get("wifi-blacklist", []),
         whitelist=whitelist,
     ):
-        logger.error("Network conditions don't allow backup; skipping the whole run.")
+        log("Network conditions don't allow backup; skipping the whole run.")
         return 1
 
     log_dir_str = log_path or config.get("log-path")
@@ -145,7 +164,7 @@ def run(
         wanted = set(only)
         unknown = wanted - set(profiles)
         if unknown:
-            logger.error(
+            log(
                 f"--only references unknown profile(s): {sorted(unknown)}; "
                 f"available: {profiles}"
             )
@@ -167,6 +186,8 @@ def run(
             sinks = [sys.stderr]
 
         _tee(f"Starting backup on {datetime.now().ctime()}\n", sinks)
+        _notify(notify_on, "Backup started",
+            f"{len(profiles)} profile(s); fix-home for {len(fix_homes_users)} user(s)")
 
         # results entry: (name, status, would_add_bytes_or_None, diag_path_or_None)
         results: list[tuple[str, str, int | None, Path | None]] = []
@@ -193,6 +214,8 @@ def run(
                 sinks,
             )
             _print_summary(sinks, results)
+            _notify(notify_on, "Backup aborted",
+                "fix-home reported pending actions", urgent=True)
             return 1
 
         for profile in profiles:
@@ -217,7 +240,7 @@ def run(
                     _tee(f"Wrote diagnostic to {diag_path}\n", sinks)
             except Exception as e:
                 _tee(f"diagnostic for {profile} failed: {e}\n", sinks)
-                logger.error(f"diagnostic for {profile} failed: {e}")
+                log(f"diagnostic for {profile} failed: {e}")
 
             total_bytes = sum(asize for _, asize, _ in items)
 
@@ -251,11 +274,18 @@ def run(
             else:
                 sub, rc = profile_failure
                 results.append((profile, f"{sub} failed (exit {rc})", total_bytes, diag_path))
+                _notify(notify_on, f"Backup failed: {profile}",
+                    f"`restic {sub}` exited with {rc}", urgent=True)
 
         _print_summary(sinks, results)
 
-        failures = sum(1 for _, status, *_ in results if status != "OK" and status != "dry-run OK")
+        ok_count = sum(1 for _, status, *_ in results if status == "OK" or status == "dry-run OK")
+        failures = len(results) - ok_count
         if failures:
-            _tee(f"run-backup completed with {failures} failure(s)\n", sinks)
+            _tee(f"backup completed with {failures} failure(s)\n", sinks)
+            _notify(notify_on, "Backup finished with failures",
+                f"{ok_count} OK / {failures} failed", urgent=True)
             return 1
+        _notify(notify_on, "Backup finished",
+            f"{ok_count} profile(s)/action(s) OK")
     return 0

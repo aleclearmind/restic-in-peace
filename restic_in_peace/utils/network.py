@@ -2,7 +2,7 @@ import re
 import os
 
 from .command import run_command
-from .logging import logger
+from .logging import log
 
 
 def get_active_network_interface(for_ip="1.1.1.1"):
@@ -34,45 +34,45 @@ def get_active_network_interface(for_ip="1.1.1.1"):
 def get_wifi_network():
     interface = get_active_network_interface()
     if interface is None:
-        logger.error("Could not determine default network interface")
+        log("Could not determine default network interface")
         return
 
     with open(os.path.join("/sys/class/net/", interface, "uevent")) as f:
         if "DEVTYPE=wlan" not in f.read():
-            logger.info(f"Default interface {interface} was not determined to be wifi")
+            log(f"Default interface {interface} was not determined to be wifi")
             return
 
     process = run_command(f"iw dev {interface} link", shell=True)
     essid_regex = re.compile("SSID: (?P<essid>.*)")
     match = essid_regex.search(process.stdout)
     if match is None:
-        logger.error(f"Could not determine network for interface {interface}")
+        log(f"Could not determine network for interface {interface}")
         return
     else:
         network = match.group("essid")
-        logger.info(f"Interface {interface} is connected to {network}")
+        log(f"Interface {interface} is connected to {network}")
         return network
 
 
 def network_ok(blacklist=[], whitelist=[]):
     current_network = get_wifi_network()
     if current_network is None:
-        logger.info(f"The computer default route does not appear to be a wireless network")
+        log(f"The computer default route does not appear to be a wireless network")
         return True
 
     for pattern in blacklist:
         if re.search(pattern, current_network):
-            logger.info(f"Network {current_network} is blacklisted")
+            log(f"Network {current_network} is blacklisted")
             return False
 
     if not whitelist:
-        logger.info(f"Network {current_network} is not blacklisted and no whitelist supplied, continuing...")
+        log(f"Network {current_network} is not blacklisted and no whitelist supplied, continuing...")
         return True
 
     for pattern in whitelist:
         if re.search(pattern, current_network):
-            logger.info(f"Network {current_network} is whitelisted")
+            log(f"Network {current_network} is whitelisted")
             return True
     else:
-        logger.info(f"Network {current_network} is not in the whitelist")
+        log(f"Network {current_network} is not in the whitelist")
         return False

@@ -70,7 +70,7 @@ def test_unknown_top_level_key_rejected(tmp_path: Path) -> None:
 
 
 def test_log_path_is_optional(tmp_path: Path) -> None:
-    # log-path is optional; run-backup falls back to stderr when missing.
+    # log-path is optional; backup falls back to stderr when missing.
     path = _write(tmp_path, {})
     assert profile.load_config(path) == {}
 
