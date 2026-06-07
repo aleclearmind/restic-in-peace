@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
-import re
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from . import profile as profile_mod
 from .utils import log
@@ -39,41 +39,80 @@ def _collect_files(roots: list[Path]) -> set[str]:
     return all_files
 
 
-def _build_filter(config: dict[str, Any], profiles: list[str], all_files: set[str]) -> re.Pattern[str] | None:
+def _as_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    return list(value)
+
+
+def _matches_exclude(path: str, pattern: str) -> bool:
+    """Loose port of restic's exclude semantics for the implicit-classification
+    heuristic. Faithful enough for the common cases, with two documented
+    short-cuts:
+
+    - restic's `**` (zero or more path segments) is not implemented. Patterns
+      using it will under-match; affected files land in `implicit` rather than
+      being filtered out, which is the right direction to err for a "did I
+      forget anything?" report.
+    - restic anchors a leading-`/` pattern to the source root, not the
+      filesystem root. We don't have a back-reference to which source covers
+      a given path, so we treat anchored patterns as absolute paths against
+      the filesystem. Users writing `/cache` with source `/home/me` (meaning
+      `/home/me/cache`) won't get a match.
+
+    For everything else, we follow restic's per-sub-path semantics:
+    - A pattern with no `/` is tested against each path component; restic's
+      `*.tmp` matches `foo.tmp` whether it appears as a basename or as an
+      ancestor directory name.
+    - A pattern containing `/` is tested against each path suffix; restic's
+      `foo/*.log` matches when a contiguous tail of the path matches.
+
+    Python's `fnmatch.fnmatchcase` is permissive about `/` (its `*` matches
+    `/`), but applied to single components or path suffixes the behavior
+    coincides with restic's stricter `*` for these unit-of-matching cases.
+    """
+    if pattern.startswith("/"):
+        return fnmatch.fnmatchcase(path, pattern)
+    parts = path.split(os.sep)
+    if "/" in pattern:
+        return any(
+            fnmatch.fnmatchcase(os.sep.join(parts[i:]), pattern)
+            for i in range(len(parts))
+        )
+    return any(fnmatch.fnmatchcase(part, pattern) for part in parts)
+
+
+def _build_explainer(
+    config: dict[str, Any], profiles: list[str], all_files: set[str],
+) -> Callable[[str], bool]:
+    """Return `explained(path) -> bool` that answers "is this path's absence
+    from the backup explained by some profile's exclude pattern or by a
+    discovered exclude-if-present marker?". The negation drives the
+    implicitly-non-backuped-files report."""
     excludes: list[str] = []
-    sources: list[str] = []
     markers: set[str] = set()
     for name in profiles:
         settings, _ = profile_mod.resolve(config, name, "backup")
+        excludes.extend(_as_list(settings.get("exclude")))
+        markers.update(_as_list(settings.get("exclude-if-present")))
 
-        excl = settings.get("exclude") or []
-        if isinstance(excl, str):
-            excl = [excl]
-        excludes.extend(re.sub(r"\*", r".*", e) for e in excl)
-
-        srcs = settings.get("source") or []
-        if isinstance(srcs, str):
-            srcs = [srcs]
-        sources.extend(srcs)
-
-        m = settings.get("exclude-if-present") or []
-        if isinstance(m, str):
-            m = [m]
-        markers.update(m)
-
-    parts = [e for e in excludes if e not in sources]
-
+    marker_dirs: set[str] = set()
     if markers:
-        marker_dirs: set[str] = set()
         for f in all_files:
-            parent, name = os.path.split(f)
-            if name in markers:
+            parent, basename = os.path.split(f)
+            if basename in markers:
                 marker_dirs.add(parent)
-        parts.extend(sorted(marker_dirs))
 
-    if not parts:
-        return None
-    return re.compile("^(" + "|".join(parts) + ")")
+    marker_prefixes = tuple(d + os.sep for d in marker_dirs)
+
+    def explained(path: str) -> bool:
+        if marker_prefixes and path.startswith(marker_prefixes):
+            return True
+        return any(_matches_exclude(path, p) for p in excludes)
+
+    return explained
 
 
 def run(config_path: str, output_dir: str) -> int:
@@ -126,8 +165,8 @@ def run(config_path: str, output_dir: str) -> int:
     non_backed_up = sorted(all_files - backed_up)
     (out_dir / "non-backuped-files").write_text("\n".join(non_backed_up) + "\n")
 
-    pattern = _build_filter(config, profiles, all_files)
-    implicit = non_backed_up if pattern is None else [p for p in non_backed_up if not pattern.match(p)]
+    explained = _build_explainer(config, profiles, all_files)
+    implicit = [p for p in non_backed_up if not explained(p)]
     (out_dir / "implicitly-non-backuped-files").write_text("\n".join(implicit) + "\n")
 
     for log_path in log_files:
