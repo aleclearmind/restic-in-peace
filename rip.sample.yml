@@ -34,4 +34,4 @@ fix-homes:
       - .vimrc
       - .bashrc
 
-log-path: backup-logs
+log-path: /var/log/restic-in-peace

@@ -42,6 +42,7 @@ _RIP_PROPERTIES: dict[str, dict[str, Any]] = {
     "wifi-whitelist": {"type": "array", "items": {"type": "string"}},
     "wifi-blacklist": {"type": "array", "items": {"type": "string"}},
     "desktop-notifications": {"type": "boolean"},
+    "frequency": {"type": "string"},
 }
 
 
@@ -90,7 +91,7 @@ CONFIG_SCHEMA: dict[str, Any] = {
             "additionalProperties": {"$ref": "#/$defs/fixHomeUser"},
         },
         # Top-level rip knobs (these are rejected inside profiles).
-        "log-path": {"type": "string"},
+        "log-path": {"type": "string", "pattern": "^/"},
         **_RIP_PROPERTIES,
     },
     "$defs": {
@@ -132,7 +133,38 @@ def load_config(path: str) -> dict[str, Any]:
         location = "/".join(str(p) for p in e.absolute_path) or "<root>"
         raise ConfigError(f"{path}: schema error at {location}: {e.message}") from e
 
+    if "frequency" in config:
+        _enforce_tag_matches_name(config, path)
+
     return config
+
+
+def _enforce_tag_matches_name(config: dict[str, Any], path: str) -> None:
+    """When `frequency` is set, the orchestrator uses each profile's `tag` to
+    look up its latest snapshot. The lookup is per-profile, so every
+    common-inheriting profile must declare its own `tag` and it must equal the
+    profile's own name (the convention `rip backup` relies on).
+    """
+    for name in children_of(config, "common"):
+        settings, _ = resolve(config, name, "backup")
+        tag = settings.get("tag")
+        if isinstance(tag, list):
+            if len(tag) != 1:
+                raise ConfigError(
+                    f"{path}: profile {name!r} must have exactly one tag when "
+                    f"`frequency` is set (got {tag!r})"
+                )
+            tag = tag[0]
+        if tag is None:
+            raise ConfigError(
+                f"{path}: profile {name!r} needs an explicit `tag: {name}` "
+                f"under `backup:` when top-level `frequency` is set"
+            )
+        if tag != name:
+            raise ConfigError(
+                f"{path}: profile {name!r} has tag {tag!r}; when `frequency` "
+                f"is set the tag must match the profile name"
+            )
 
 
 def children_of(config: dict[str, Any], parent: str) -> list[str]:

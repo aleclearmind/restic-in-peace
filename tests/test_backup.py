@@ -458,3 +458,151 @@ def test_desktop_notifications_invoke_notify_send(
     invocations = notify_log.read_text()
     assert "Backup started" in invocations
     assert "Backup finished" in invocations
+
+
+def _freq_config(log_dir, repo, password, source):
+    """Same shape as _config_dict but every profile has tag matching its name —
+    the requirement when `frequency` is set."""
+    return {
+        "log-path": str(log_dir),
+        "profiles": {
+            "common": {
+                "repository": str(repo),
+                "env": {"RESTIC_PASSWORD": password},
+            },
+            "p1": {
+                "inherit": "common",
+                "backup": {"source": [str(source)], "tag": "p1"},
+            },
+        },
+    }
+
+
+def test_frequency_skips_recent_profile(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    # Run a backup once → second invocation with a generous frequency should
+    # skip without creating a new snapshot.
+    (fake_home / "doc.txt").write_text("hi\n")
+    log_dir = tmp_path / "logs"
+
+    # First run: no frequency, single snapshot lands.
+    config_no_freq = write_config(_freq_config(log_dir, restic_repo, restic_password, fake_home))
+    r1 = subprocess.run(
+        [rip_bin, "--config", str(config_no_freq), "backup"],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert r1.returncode == 0, f"stdout: {r1.stdout}\nstderr: {r1.stderr}"
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+
+    # Second run: same config but with frequency=1w. The fresh snapshot is
+    # well within the window, so we expect skip + no new snapshot.
+    log_dir2 = tmp_path / "logs2"
+    config_with_freq = write_config({
+        **_freq_config(log_dir2, restic_repo, restic_password, fake_home),
+        "frequency": "1w",
+    })
+    r2 = subprocess.run(
+        [rip_bin, "--config", str(config_with_freq), "backup"],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert r2.returncode == 0, f"stdout: {r2.stdout}\nstderr: {r2.stderr}"
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+    log = (next(log_dir2.iterdir()) / "backup.log").read_text()
+    assert "up-to-date" in log
+
+
+def test_frequency_runs_when_no_prior_snapshot(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    # Frequency gates only fire after the first snapshot exists. Empty repo →
+    # backup must run.
+    (fake_home / "doc.txt").write_text("hi\n")
+    log_dir = tmp_path / "logs"
+    config = write_config({
+        **_freq_config(log_dir, restic_repo, restic_password, fake_home),
+        "frequency": "1w",
+    })
+
+    r = subprocess.run(
+        [rip_bin, "--config", str(config), "backup"],
+        capture_output=True, text=True, env=test_env,
+    )
+    assert r.returncode == 0, f"stdout: {r.stdout}\nstderr: {r.stderr}"
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+
+
+def test_ignore_frequency_bypasses_the_gate(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    # First run lands a snapshot, second run uses --ignore-frequency and the
+    # snapshot count must grow to 2 despite the recent prior backup.
+    (fake_home / "doc.txt").write_text("hi\n")
+    log_dir = tmp_path / "logs"
+    config = write_config({
+        **_freq_config(log_dir, restic_repo, restic_password, fake_home),
+        "frequency": "1w",
+    })
+
+    subprocess.run(
+        [rip_bin, "--config", str(config), "backup", "--ignore-frequency"],
+        capture_output=True, text=True, env=test_env, check=True,
+    )
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 1
+
+    # New data + --ignore-frequency → new snapshot.
+    (fake_home / "doc.txt").write_text("hi2\n")
+    log_dir2 = tmp_path / "logs2"
+    config2 = write_config({
+        **_freq_config(log_dir2, restic_repo, restic_password, fake_home),
+        "frequency": "1w",
+    })
+    subprocess.run(
+        [rip_bin, "--config", str(config2), "backup", "--ignore-frequency"],
+        capture_output=True, text=True, env=test_env, check=True,
+    )
+    assert snapshot_count(restic_bin, restic_repo, restic_password) == 2
+
+
+def test_all_up_to_date_suppresses_finished_notification(
+    fake_home, restic_repo, restic_password, tmp_path, rip_bin, restic_bin, write_config, test_env
+):
+    # When every profile is up-to-date, we still want exit 0 — but no
+    # "Backup finished" desktop notification, just silence.
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    notify_log = tmp_path / "notify.log"
+    stub = bin_dir / "notify-send"
+    stub.write_text(f'#!/usr/bin/env bash\nprintf "%s\\n" "$@" >> {notify_log}\n')
+    stub.chmod(0o755)
+    env = {**test_env, "PATH": f"{bin_dir}:{test_env['PATH']}"}
+
+    (fake_home / "doc.txt").write_text("hi\n")
+    log_dir = tmp_path / "logs"
+
+    # First run lands a snapshot (no frequency, no skip).
+    config_init = write_config({
+        **_freq_config(log_dir, restic_repo, restic_password, fake_home),
+        "desktop-notifications": True,
+    })
+    subprocess.run(
+        [rip_bin, "--config", str(config_init), "backup"],
+        capture_output=True, text=True, env=env, check=True,
+    )
+    notify_log.write_text("")  # reset to only capture the second run
+
+    # Second run: frequency=1w; everything is up-to-date.
+    log_dir2 = tmp_path / "logs2"
+    config_gated = write_config({
+        **_freq_config(log_dir2, restic_repo, restic_password, fake_home),
+        "frequency": "1w",
+        "desktop-notifications": True,
+    })
+    r = subprocess.run(
+        [rip_bin, "--config", str(config_gated), "backup"],
+        capture_output=True, text=True, env=env,
+    )
+    assert r.returncode == 0, f"stdout: {r.stdout}\nstderr: {r.stderr}"
+    invocations = notify_log.read_text()
+    # Started fires (we don't know up front there's no work), Finished does not.
+    assert "Backup finished" not in invocations

@@ -1,5 +1,6 @@
 import math
 import re
+from datetime import timedelta
 
 
 def capture_group(l, group_name=None):
@@ -128,6 +129,34 @@ def parse(s):
         return float(m.group(1))
 
     raise ValueError(f"Could not parse {s} as number")
+
+
+_DURATION_UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+_DURATION_REGEX = re.compile(r"^\s*(\d+)\s*([smhdw])\s*$")
+
+
+def parse_duration(s: str) -> timedelta:
+    """Parse strings like '24h', '7d', '30m' into a timedelta. Single integer +
+    one of s/m/h/d/w; whitespace tolerated."""
+    m = _DURATION_REGEX.match(s)
+    if not m:
+        raise ValueError(
+            f"Could not parse {s!r} as duration; expected '<int><s|m|h|d|w>'"
+        )
+    n, unit = int(m.group(1)), m.group(2)
+    return timedelta(seconds=n * _DURATION_UNITS[unit])
+
+
+def format_duration(td: timedelta) -> str:
+    """Render a timedelta as the largest whole-unit it fits in: 7200s → '2h',
+    90s → '90s'. Used for short summary rows ('last 3h ago')."""
+    seconds = int(td.total_seconds())
+    if seconds < 0:
+        return f"-{format_duration(-td)}"
+    for unit, n in (("w", 604800), ("d", 86400), ("h", 3600), ("m", 60)):
+        if seconds >= n and seconds % n == 0:
+            return f"{seconds // n}{unit}"
+    return f"{seconds}s"
 
 
 if __name__ == "__main__":

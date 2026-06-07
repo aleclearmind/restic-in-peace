@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from contextlib import ExitStack
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import IO
 
@@ -52,6 +53,58 @@ def _stream(cmd: list[str], sinks: list[IO[str]], env: dict[str, str] | None = N
     for line in process.stdout:
         _tee(line, sinks)
     return process.wait()
+
+
+def _frequency(config: dict) -> timedelta | None:
+    raw = profile_mod.rip_settings(config).get("frequency")
+    if raw is None:
+        return None
+    return human_numbers.parse_duration(str(raw))
+
+
+def _parse_restic_time(s: str) -> datetime:
+    """Parse restic's RFC3339 timestamp. restic emits nanoseconds, which
+    stdlib's fromisoformat can't handle; truncate the fractional part to 6
+    digits before parsing."""
+    m = re.match(
+        r"^(?P<head>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})"
+        r"(?:\.(?P<frac>\d{1,9}))?"
+        r"(?P<tail>Z|[+-]\d{2}:?\d{2})?$",
+        s,
+    )
+    if m is None:
+        return datetime.fromisoformat(s)
+    head = m.group("head")
+    frac = (m.group("frac") or "")[:6]
+    tail = m.group("tail") or ""
+    if tail == "Z":
+        tail = "+00:00"
+    iso = f"{head}.{frac}{tail}" if frac else f"{head}{tail}"
+    return datetime.fromisoformat(iso)
+
+
+def _latest_snapshot_time(config: dict, profile: str) -> datetime | None:
+    """Run `restic snapshots --tag <profile> --json --no-lock --latest 1` and
+    return the newest snapshot's timestamp. Returns None if the tag has no
+    snapshots yet. Raises if the restic call fails or the output can't be
+    parsed — the orchestrator turns those into profile failures."""
+    cmd, env = profile_mod.build_command(config, profile, "snapshots")
+    cmd.extend(["--tag", profile, "--no-lock", "--json", "--latest", "1"])
+    result = subprocess.run(
+        cmd,
+        env={**os.environ, **env},
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"restic snapshots exited {result.returncode}: {result.stderr.strip()}"
+        )
+    snapshots = json.loads(result.stdout) if result.stdout.strip() else []
+    if not snapshots:
+        return None
+    latest = max(snapshots, key=lambda s: s["time"])
+    return _parse_restic_time(latest["time"])
 
 
 def _size_limit_bytes(config: dict) -> int | None:
@@ -135,6 +188,7 @@ def run(
     ignore_skip_on_battery: bool = False,
     ignore_added_size_limit: bool = False,
     ignore_wifi_whitelist: bool = False,
+    ignore_frequency: bool = False,
 ) -> int:
     config_path = os.path.abspath(config_path)
     try:
@@ -218,8 +272,34 @@ def run(
                 "fix-home reported pending actions", urgent=True)
             return 1
 
+        frequency = None if ignore_frequency else _frequency(config)
+
         for profile in profiles:
             _tee(f"Backing up profile {profile}\n", sinks)
+
+            if frequency is not None:
+                try:
+                    latest = _latest_snapshot_time(config, profile)
+                except Exception as e:
+                    _tee(f"snapshot query for {profile} failed: {e}\n", sinks)
+                    results.append((profile, f"snapshot query failed: {e}", None, None))
+                    _notify(notify_on, f"Backup failed: {profile}",
+                        f"could not query latest snapshot: {e}", urgent=True)
+                    continue
+                if latest is not None:
+                    age = datetime.now(timezone.utc) - latest
+                    if age < frequency:
+                        age_str = human_numbers.format_duration(age)
+                        freq_str = human_numbers.format_duration(frequency)
+                        _tee(
+                            f"{profile}: last snapshot {age_str} ago "
+                            f"(< frequency {freq_str}); skipping\n",
+                            sinks,
+                        )
+                        results.append(
+                            (profile, f"up-to-date (last {age_str} ago)", None, None)
+                        )
+                        continue
 
             # Dry-run pre-pass: collect (path, asize, dsize) for every file
             # restic would add or modify, write the ncdu diagnostic, and use
@@ -279,13 +359,27 @@ def run(
 
         _print_summary(sinks, results)
 
-        ok_count = sum(1 for _, status, *_ in results if status == "OK" or status == "dry-run OK")
+        def _is_success(status: str) -> bool:
+            return (
+                status == "OK"
+                or status == "dry-run OK"
+                or status.startswith("up-to-date")
+            )
+
+        ok_count = sum(1 for _, status, *_ in results if _is_success(status))
         failures = len(results) - ok_count
+        backed_up = sum(
+            1 for name, status, *_ in results
+            if status in ("OK", "dry-run OK") and not name.startswith("fix-home/")
+        )
         if failures:
             _tee(f"backup completed with {failures} failure(s)\n", sinks)
             _notify(notify_on, "Backup finished with failures",
                 f"{ok_count} OK / {failures} failed", urgent=True)
             return 1
-        _notify(notify_on, "Backup finished",
-            f"{ok_count} profile(s)/action(s) OK")
+        # No failures. Fire a "finished" notification only if there was actual
+        # backup work — silent for runs where everything was already up-to-date.
+        if backed_up > 0:
+            _notify(notify_on, "Backup finished",
+                f"{ok_count} profile(s)/action(s) OK")
     return 0

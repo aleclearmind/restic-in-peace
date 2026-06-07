@@ -46,6 +46,9 @@ def _build_parser() -> argparse.ArgumentParser:
     backup_p.add_argument("--ignore-wifi-whitelist", action="store_true",
         dest="ignore_wifi_whitelist",
         help="bypass the wifi-whitelist gate (wifi-blacklist still applies)")
+    backup_p.add_argument("--ignore-frequency", action="store_true",
+        dest="ignore_frequency",
+        help="bypass the per-profile frequency gate (run regardless of last-snapshot age)")
 
     fix_home = subparsers.add_parser("fix-home",
         help="emit a bash script (or --strict-check) for fix-homes/$USER dotfile symlinks")
@@ -76,6 +79,7 @@ def main(arguments: argparse.Namespace, restic_extras: list[str]) -> int:
             ignore_skip_on_battery=arguments.ignore_skip_on_battery,
             ignore_added_size_limit=arguments.ignore_added_size_limit,
             ignore_wifi_whitelist=arguments.ignore_wifi_whitelist,
+            ignore_frequency=arguments.ignore_frequency,
         )
 
     if arguments.command == "collect-non-backuped-files":
