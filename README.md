@@ -127,7 +127,8 @@ A few keys are worth calling out:
 | `wifi-whitelist` | List of regexes; the active wifi SSID must match one. |
 | `wifi-blacklist` | List of regexes; abort if the active wifi SSID matches any. |
 | `desktop-notifications` | Fire `notify-send` calls at run-start, run-end, fix-home abort, and per-profile failures. |
-| `log-path` | Directory where each `rip backup` invocation creates a `YYYY-MM-DD-HH-MM-SS/` sub-directory with a `backup.log` and one `<profile>.ncdu.json` diagnostic per profile. |
+| `frequency` | Skip a profile when its newest snapshot is younger than this (`24h`, `7d`, `2w`, ...). State lives in the repo — `rip` queries `restic snapshots --tag <profile>` per run. Requires every profile to declare a `tag` matching its own name. |
+| `log-path` | Absolute directory where each `rip backup` invocation creates a `YYYY-MM-DD-HH-MM-SS/` sub-directory with a `backup.log` and one `<profile>.ncdu.json` diagnostic per profile. |
 
 ### A minimal, runnable example
 
@@ -198,6 +199,7 @@ The `restic check` at the end is run *after every backup* — it should never fa
 | `--ignore-skip-on-battery` | Bypass the battery gate. |
 | `--ignore-added-size-limit` | Bypass the size-limit gate for every profile. |
 | `--ignore-wifi-whitelist` | Bypass the whitelist (the blacklist still applies). |
+| `--ignore-frequency` | Bypass the per-profile frequency gate (run regardless of last-snapshot age). |
 
 ## `rip restic`: arbitrary restic commands with a profile
 
@@ -331,4 +333,50 @@ rm -rf $RIP_TMP
 
 ## Automating with systemd
 
-Documentation for the user-level systemd timer that drives `rip backup` daily is being rewritten and will land in a follow-up.
+The orchestration pattern is the same in both deployments: an hourly timer fires `rip backup`, the per-profile `frequency:` gate decides whether each profile actually runs, the `--system`/`User=root` variant handles a host-wide install. Pick the deployment that matches how you installed `rip`.
+
+### User-level (venv install) — `rip install-timer`
+
+For a venv install on a single user account:
+
+```bash notest
+rip --config ~/.config/restic-in-peace/rip.yml install-timer
+```
+
+That writes `rip-backup.service` and `rip-backup.timer` to `~/.config/systemd/user/` with the absolute path of the running `rip` binary and the absolute path you passed to `--config` baked in. Useful flags:
+
+- `--schedule "*-*-* 03:00:00"` — override the default `hourly` `OnCalendar` expression.
+- `--system` — write to `/etc/systemd/system/` instead, for a root timer (`sudo $(which rip) ... install-timer --system`).
+- `--name custom-rip` — rename the unit pair if you want more than one timer (e.g. one for `laptop`, one for `media`).
+- `--enable` — chain `systemctl daemon-reload` and `systemctl enable --now rip-backup.timer` after writing.
+
+Without `--enable`, the command prints the next-step commands so you can review the units first.
+
+### NixOS — declarative module
+
+Import the NixOS module (no flake required — `fetchTarball` works fine):
+
+```nix notest
+{ pkgs, ... }: let
+  rip-src = builtins.fetchTarball {
+    url    = "https://github.com/aleclearmind/restic-in-peace/archive/master.tar.gz";
+    sha256 = "0000000000000000000000000000000000000000000000000000";
+  };
+in {
+  imports = [ "${rip-src}/nix/module.nix" ];
+
+  services.restic-in-peace = {
+    enable     = true;
+    configFile = "/etc/restic-in-peace/rip.yml";
+    schedule   = "hourly";
+  };
+}
+```
+
+Flake users wire it via `inputs.restic-in-peace.nixosModules.default` instead.
+
+Notes:
+
+- `configFile` is a string, not a Nix path. Passing a path would copy `rip.yml` (with its `RESTIC_PASSWORD`) into the world-readable Nix store. The module enforces an absolute path at evaluation time but doesn't touch the file itself — provision it out of band (manual `scp`, configuration management, etc.) and leave it mode `0600`.
+- The generated service runs as `root`. `desktop-notifications: true` won't do anything useful from a root unit with no session bus; leave it `false` in this deployment.
+- `services.restic-in-peace.package` defaults to a build from the source you imported; override it with an overlay-built rip if you need to.
