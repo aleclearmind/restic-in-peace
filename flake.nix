@@ -28,6 +28,7 @@
             packages = [
               restic-in-peace
               pkgs.restic
+              pkgs.systemd  # provides systemd-analyze for unit-file tests
               (python.withPackages (ps: with ps; [
                 requests
                 pyyaml
@@ -46,6 +47,7 @@
             nativeBuildInputs = [
               restic-in-peace
               pkgs.restic
+              pkgs.systemd
               (python.withPackages (ps: with ps; [
                 pytest pyyaml jsonschema tqdm mypy types-pyyaml types-requests requests
               ]))
