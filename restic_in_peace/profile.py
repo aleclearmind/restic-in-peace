@@ -20,6 +20,7 @@ COMMAND_SECTIONS = frozenset({
     "backup", "unlock", "snapshots", "restore", "mount",
     "check", "forget", "prune", "init", "find", "ls",
     "stats", "tag", "diff", "copy", "rebuild-index", "cat",
+    "dump", "key", "list", "migrate", "recover", "repair",
 })
 
 
@@ -40,10 +41,6 @@ _RIP_PROPERTIES: dict[str, dict[str, Any]] = {
     "skip-on-battery": {"type": "boolean"},
     "wifi-whitelist": {"type": "array", "items": {"type": "string"}},
     "wifi-blacklist": {"type": "array", "items": {"type": "string"}},
-    "monitor-url": {"type": "array", "items": {"type": "string"}},
-    "desktop-notifications": {"type": "boolean"},
-    "tee-restic-logs": {"type": "string"},
-    "loglevel": {"type": "string"},
 }
 
 
@@ -220,3 +217,15 @@ def to_argv(settings: dict[str, Any], command: str) -> tuple[list[str], list[str
             flags.extend([flag, str(value)])
 
     return flags, [str(s) for s in sources]
+
+
+def build_command(
+    config: dict[str, Any], name: str, command: str,
+) -> tuple[list[str], dict[str, str]]:
+    """Return (argv, env) ready to spawn restic for profile `name` running `command`.
+
+    argv is ["restic", command, *flags, *positionals]; env is the profile's
+    env block (e.g. RESTIC_PASSWORD), stringified."""
+    settings, env = resolve(config, name, command)
+    flags, positionals = to_argv(settings, command)
+    return ["restic", command, *flags, *positionals], {k: str(v) for k, v in env.items()}

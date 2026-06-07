@@ -15,7 +15,7 @@ def test_emits_bash_for_pending_actions(fake_home, current_user, write_config, r
     })
 
     result = subprocess.run(
-        [rip_bin, "fix-home", str(config)],
+        [rip_bin, "--config", str(config), "fix-home"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, result.stderr
@@ -37,7 +37,7 @@ def test_strict_fails_when_action_needed(fake_home, current_user, write_config, 
     })
 
     result = subprocess.run(
-        [rip_bin, "fix-home", "--strict", str(config)],
+        [rip_bin, "--config", str(config), "fix-home", "--strict"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode != 0
@@ -61,7 +61,7 @@ def test_strict_succeeds_when_state_is_clean(fake_home, current_user, write_conf
     })
 
     result = subprocess.run(
-        [rip_bin, "fix-home", "--strict", str(config)],
+        [rip_bin, "--config", str(config), "fix-home", "--strict"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, result.stderr
@@ -72,7 +72,7 @@ def test_no_user_section_fails(fake_home, write_config, rip_bin, test_env):
     env = {**test_env, "USER": "nonexistent-user-xyz"}
 
     result = subprocess.run(
-        [rip_bin, "fix-home", str(config)],
+        [rip_bin, "--config", str(config), "fix-home"],
         capture_output=True, text=True, env=env,
     )
     assert result.returncode != 0

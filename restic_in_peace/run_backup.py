@@ -105,7 +105,7 @@ def _print_summary(
 def _run_fix_home(config_path: str, sinks: list[IO[str]], sudo_user: str | None = None) -> int:
     """Verify that no fix-home action is pending for `sudo_user` (or the current user)."""
     prefix = ["sudo", "-Hu", sudo_user] if sudo_user else []
-    cmd = prefix + ["restic-in-peace", "fix-home", "--strict", config_path]
+    cmd = prefix + ["restic-in-peace", "--config", config_path, "fix-home", "--strict"]
     return _stream(cmd, sinks)
 
 
@@ -239,11 +239,8 @@ def run(
 
             profile_failure: tuple[str, int] | None = None
             for subcommand in subcommands:
-                settings, env_vars = profile_mod.resolve(config, profile, subcommand)
-                flags, positionals = profile_mod.to_argv(settings, subcommand)
-                cmd = ["restic", subcommand] + flags + positionals
-                proc_env = {**os.environ, **{k: str(v) for k, v in env_vars.items()}}
-                rc = _stream(cmd, sinks, env=proc_env)
+                cmd, env_vars = profile_mod.build_command(config, profile, subcommand)
+                rc = _stream(cmd, sinks, env={**os.environ, **env_vars})
                 if rc != 0:
                     _tee(f"{subcommand} for {profile} exited with {rc}\n", sinks)
                     profile_failure = (subcommand, rc)

@@ -30,7 +30,7 @@ def test_orchestrates_backup(
     config = write_config(_config_dict(log_dir, restic_repo, restic_password, fake_home))
 
     result = subprocess.run(
-        [rip_bin, "run-backup", str(config)],
+        [rip_bin, "--config", str(config), "run-backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -81,14 +81,14 @@ def test_runs_forget_when_section_present(
     for content in ("v1\n", "v2\n"):
         (fake_home / "doc.txt").write_text(content)
         subprocess.run(
-            [rip_bin, "--config", str(config_path), "--name", "p1", "restic", "backup"],
+            [rip_bin, "--config", str(config_path), "restic", "backup", "p1"],
             capture_output=True, text=True, env=test_env, check=True,
         )
     assert snapshot_count(restic_bin, restic_repo, restic_password) == 2
 
     (fake_home / "doc.txt").write_text("v3\n")
     result = subprocess.run(
-        [rip_bin, "run-backup", str(config_path)],
+        [rip_bin, "--config", str(config_path), "run-backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -103,7 +103,7 @@ def test_dry_run_skips_unlock_and_check_and_creates_no_snapshot(
     config = write_config(_config_dict(log_dir, restic_repo, restic_password, fake_home))
 
     result = subprocess.run(
-        [rip_bin, "run-backup", "--dry-run", str(config)],
+        [rip_bin, "--config", str(config), "run-backup", "--dry-run"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -143,7 +143,7 @@ def test_size_limit_skips_profile_in_run_backup(
     })
 
     result = subprocess.run(
-        [rip_bin, "run-backup", str(config)],
+        [rip_bin, "--config", str(config), "run-backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode != 0  # summary reports a failure row
@@ -167,7 +167,7 @@ def test_unknown_run_backup_flag_rejected(
         },
     })
     result = subprocess.run(
-        [rip_bin, "run-backup", "--ignore-size-limit", str(config)],
+        [rip_bin, "--config", str(config), "run-backup", "--ignore-size-limit"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode != 0
@@ -197,7 +197,7 @@ def test_ignore_added_size_limit_bypasses_the_gate(
     })
 
     result = subprocess.run(
-        [rip_bin, "run-backup", "--ignore-added-size-limit", str(config)],
+        [rip_bin, "--config", str(config), "run-backup", "--ignore-added-size-limit"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -239,7 +239,7 @@ def test_only_filters_profiles_by_name(
     })
 
     result = subprocess.run(
-        [rip_bin, "run-backup", "--only", "alpha", str(config)],
+        [rip_bin, "--config", str(config), "run-backup", "--only", "alpha"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -264,7 +264,7 @@ def test_only_unknown_profile_fails_loudly(
         },
     })
     result = subprocess.run(
-        [rip_bin, "run-backup", "--only", "nope", str(config)],
+        [rip_bin, "--config", str(config), "run-backup", "--only", "nope"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode != 0
@@ -291,7 +291,7 @@ def test_log_path_cli_overrides_config(
     log_dir = tmp_path / "via-cli"
 
     result = subprocess.run(
-        [rip_bin, "run-backup", "--log-path", str(log_dir), str(config)],
+        [rip_bin, "--config", str(config), "run-backup", "--log-path", str(log_dir)],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -321,7 +321,7 @@ def test_falls_back_to_stderr_when_log_path_missing(
     })
 
     result = subprocess.run(
-        [rip_bin, "run-backup", str(config)],
+        [rip_bin, "--config", str(config), "run-backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -343,7 +343,7 @@ def test_fix_home_failure_aborts_run_backup(
     ))
 
     result = subprocess.run(
-        [rip_bin, "run-backup", str(config)],
+        [rip_bin, "--config", str(config), "run-backup"],
         capture_output=True, text=True, env=test_env,
     )
     # fix-home failed → run-backup aborts before any backup runs.
@@ -393,7 +393,7 @@ def test_continues_after_one_profile_fails(
     })
 
     result = subprocess.run(
-        [rip_bin, "run-backup", str(config)],
+        [rip_bin, "--config", str(config), "run-backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode != 0  # because `bad` failed
@@ -421,7 +421,7 @@ def test_proceeds_when_fix_home_strict_passes(
     ))
 
     result = subprocess.run(
-        [rip_bin, "run-backup", str(config)],
+        [rip_bin, "--config", str(config), "run-backup"],
         capture_output=True, text=True, env=test_env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"

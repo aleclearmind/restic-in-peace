@@ -91,9 +91,6 @@ These parameters are added by restic-in-peace:
   wifi network not matching one of the provided regexes
 * `wifi-blacklist`: abort the backup if the computer is routed through a
   wifi network matching one of the provided regexes
-* `monitor-url`: list of URLs that receive a POST with backup events
-* `desktop-notifications`: if true, use `notify-send` to notify of events
-* `tee-restic-logs`: useful to redirect restic output to a file
 
 Read `restic-in-peace --help` for more details. Settings can be placed
 under a command-specific subsection (e.g. `backup`, `check`) to scope them

@@ -21,7 +21,6 @@
           propagatedBuildInputs = with python.pkgs; [
             loguru
             requests
-            notify2
             pyyaml
             jsonschema
             tqdm
@@ -63,7 +62,6 @@
             (python.withPackages (ps: with ps; [
               loguru
               requests
-              notify2
               pyyaml
               jsonschema
               tqdm
@@ -81,7 +79,7 @@
             restic-in-peace
             pkgs.restic
             (python.withPackages (ps: with ps; [
-              pytest pyyaml jsonschema tqdm mypy types-pyyaml types-requests loguru requests notify2
+              pytest pyyaml jsonschema tqdm mypy types-pyyaml types-requests loguru requests
             ]))
           ];
         } ''

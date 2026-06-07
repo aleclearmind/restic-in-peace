@@ -37,7 +37,7 @@ def test_collect_partitions_files(
     env = {**test_env, "RIP_COLLECT_ROOTS": str(fake_home)}
 
     result = subprocess.run(
-        [rip_bin, "collect-non-backuped-files", str(config_path), str(out)],
+        [rip_bin, "--config", str(config_path), "collect-non-backuped-files", str(out)],
         capture_output=True, text=True, env=env,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"

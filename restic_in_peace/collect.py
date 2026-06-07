@@ -19,20 +19,8 @@ SYSTEM_DIRS: frozenset[str] = frozenset({
 })
 
 
-def _restic_command(
-    config: dict[str, Any],
-    name: str,
-    command: str,
-    extra_args: tuple[str, ...] = (),
-) -> tuple[list[str], dict[str, Any]]:
-    settings, env = profile_mod.resolve(config, name, command)
-    flags, positionals = profile_mod.to_argv(settings, command)
-    return ["restic", command] + flags + list(extra_args) + positionals, env
-
-
-def _run_restic(cmd: list[str], env_overrides: dict[str, Any], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    env = os.environ.copy()
-    env.update({k: str(v) for k, v in env_overrides.items()})
+def _run_restic(cmd: list[str], env_overrides: dict[str, str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, **env_overrides}
     return subprocess.run(cmd, env=env, **kwargs)
 
 
@@ -106,13 +94,13 @@ def run(config_path: str, output_dir: str) -> int:
     for profile in profiles:
         logger.info(f"Collecting files backed up by {profile}")
 
-        unlock_cmd, env = _restic_command(config, profile, "unlock")
+        unlock_cmd, env = profile_mod.build_command(config, profile, "unlock")
         _run_restic(unlock_cmd, env, capture_output=True)
 
-        backup_cmd, env = _restic_command(
-            config, profile, "backup",
-            extra_args=("--dry-run", "--verbose=2", "--json"),
-        )
+        backup_cmd, env = profile_mod.build_command(config, profile, "backup")
+        # backup_cmd is ["restic", "backup", *flags, *sources]; insert the
+        # dry-run options between the subcommand and the flags.
+        backup_cmd[2:2] = ["--dry-run", "--verbose=2", "--json"]
         result = _run_restic(backup_cmd, env, capture_output=True, text=True)
 
         log_path = out_dir / f"{profile}.log.json"

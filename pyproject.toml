@@ -7,5 +7,5 @@ warn_return_any = true
 no_implicit_optional = true
 
 [[tool.mypy.overrides]]
-module = ["notify2", "loguru.*", "yaml", "jsonschema", "tqdm"]
+module = ["loguru.*", "yaml", "jsonschema", "tqdm"]
 ignore_missing_imports = true

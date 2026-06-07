@@ -4,9 +4,6 @@ wifi-whitelist:
   - whitelisted-network
 wifi-blacklist:
   - blacklisted-network
-monitor-url:
-  - https://<monitor_host>/restic
-desktop-notifications: true
 
 profiles:
   common:

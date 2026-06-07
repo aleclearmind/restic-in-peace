@@ -20,7 +20,6 @@ def test_full_config_validates(tmp_path: Path) -> None:
         "added-size-limit": "5GB",
         "skip-on-battery": True,
         "wifi-whitelist": ["home-net"],
-        "monitor-url": ["https://m.example/restic"],
         "profiles": {
             "common": {
                 "repository": "/backup",
